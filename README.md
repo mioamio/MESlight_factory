@@ -53,7 +53,7 @@
 git clone git@github.com:mioamio/MESlight_factory.git
 
 # 2. Перейти в папку
-cd MESlight_factory
+cd MESlight_factory-main
 
 # 3. Установить зависимости
 go mod tidy
