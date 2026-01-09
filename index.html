@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <title>СКТ-ПРО</title>
+    
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%233b82f6'/%3E%3Ctext x='50' y='70' font-family='Arial, sans-serif' font-weight='900' font-size='50' fill='white' text-anchor='middle'%3EСКТ%3C/text%3E%3C/svg%3E">
+    
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        :root {
+            --sidebar-bg: #0f172a; --sidebar-text: #94a3b8; --bg-main: #6caceb;
+            --surface: #ffffff; --accent: #3b82f6; --success: #10b981;
+            --danger: #ef4444; --warning: #f59e0b; --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            --c-blue: #2563eb; --c-purple: #7c3aed; --c-green: #16a34a;
+            
+            --fs-stat: 7rem; --fs-sidebar: 1rem; --fs-table: 1.5rem;
+            --fs-nav-icon: 1.6rem; --fs-header: 1rem; --fs-card-title: 1rem; --fs-card-meta: 0.85rem;
+            
+            /* Безопасная зона для iPhone (челка и нижняя полоска) */
+            --safe-top: env(safe-area-inset-top, 20px);
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+        }
+
+        * { scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, 0.5) transparent; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: rgba(148, 163, 184, 0.3); border-radius: 20px; }
+        
+        body { 
+            font-family: 'Manrope', sans-serif; height: 100vh; height: 100dvh;
+            overflow: hidden; display: flex; background-color: var(--bg-main); 
+            -webkit-user-select: none; user-select: none; cursor: default;
+            overscroll-behavior: none; 
+        }
+        input { -webkit-user-select: text !important; user-select: text !important; cursor: text !important; }
+
+        body.bg-error-persistent { background-color: #ef4444 !important; }
+        body.bg-error-persistent .sidebar { border-right-color: #fca5a5; }
+        body.bg-error-persistent .stat-val-big { color: white !important; }
+        body.bg-error-persistent .stat-label-main { color: rgba(255,255,255,0.8) !important; }
+
+        /* SIDEBAR DESKTOP */
+        .sidebar { background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; z-index: 1050; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease; width: 300px; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.05); }
+        .sidebar-inner { width: 300px; height: 100%; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
+        .sidebar.collapsed { width: 0; padding: 0; border: none; }
+        .sidebar-header-group { flex-shrink: 0; display: flex; flex-direction: column; }
+        
+        .btn-create { background: var(--accent); color: white; border: none; padding: 12px; font-size: 1rem; border-radius: 12px; font-weight: 700; width: 100%; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; transition: 0.2s; }
+        .btn-create:hover { background: #2563eb; transform: translateY(-2px); }
+        
+        .btn-all-scans { background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); padding: 10px; font-size: 0.9rem; border-radius: 12px; font-weight: 600; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; white-space: nowrap; }
+        .btn-all-scans.active { background: rgba(255,255,255,0.2); color: white; border-color: white; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+        
+        .sidebar-search { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: white; border-radius: 8px; padding: 10px 12px; width: 100%; font-size: 0.9rem; margin-bottom: 10px; outline: none; }
+        .sidebar-search:focus { border-color: var(--accent); background: rgba(0,0,0,0.5); }
+        
+        .orders-wrapper { flex: 1; overflow-y: auto; min-height: 0; padding-right: 4px; padding-bottom: 80px; -webkit-overflow-scrolling: touch; }
+        .group-header { margin-bottom: 5px; }
+        .group-summary { cursor: pointer; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; padding: 10px 5px; display: flex; justify-content: space-between; align-items: center; }
+        .group-summary:hover { color: white; }
+        .group-header.open .group-content { display: block; animation: fadeIn 0.3s; }
+        .group-content { display: none; }
+        .group-summary.today { color: var(--success); }
+        .group-summary.inwork { color: #f59e0b; }
+
+        .order-card { background: rgba(255,255,255,0.05); border: 2px solid transparent; padding: 12px 15px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; will-change: transform, box-shadow; }
+        .order-card:hover { transform: translateY(-1px); }
+        .order-card.status-work { background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.4)); border-color: rgba(249, 115, 22, 0.3); }
+        .order-card.status-done { background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(21, 128, 61, 0.4)); border-color: rgba(34, 197, 94, 0.3); }
+        .order-card.active { border-color: #ffffff !important; box-shadow: 0 0 15px rgba(255, 255, 255, 0.25); z-index: 5; }
+        .order-progress-bg { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.15)); z-index: 0; transition: width 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); pointer-events: none; }
+        .order-card.active .order-progress-bg { background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.25)); }
+        .order-content-wrap { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 4px; }
+        .order-top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        .order-title { font-weight: 800; font-size: var(--fs-card-title); color: white; line-height: 1.2; word-break: break-all; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .order-meta { font-size: var(--fs-card-meta); color: rgba(255,255,255,0.8); font-family: 'JetBrains Mono', monospace; display: flex; justify-content: space-between; margin-top: 2px; }
+        .order-card.active .order-meta { color: #ffffff; font-weight: 700; }
+        .watermark-loc { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 900; color: rgba(255,255,255,0.1); z-index: 1; pointer-events: none; line-height: 1; font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+        .order-card.active .watermark-loc { color: rgba(255,255,255,0.25); }
+        .order-controls { position: absolute; top: 50%; transform: translateY(-50%); right: 8px; display: none; gap: 6px; z-index: 10; }
+        .order-card:hover .order-controls, .order-card.active .order-controls { display: flex; }
+        .btn-mini { width: 34px; height: 34px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.25); color: #ffffff; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .btn-mini:hover { background: white; color: var(--accent); }
+        .btn-mini.del:hover { background: #fee2e2; color: #ef4444; }
+
+        .sidebar-footer { margin-top: auto; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+        .btn-tool { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; width: 100%; padding: 12px; border-radius: 10px; font-weight: 600; font-size: 0.9rem; margin-top: 8px; text-align: left; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .btn-tool:hover { background: rgba(255,255,255,0.05); color: white; border-color: white; }
+
+        /* MAIN LAYOUT DESKTOP */
+        .main-layout { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: relative; z-index: 1; }
+        .top-bar { height: 70px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; font-size: var(--fs-header); }
+        .mode-btn { background: #f1f5f9; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 1rem; color: #475569; display: flex; align-items: center; gap: 8px; }
+        body.mode-itr .mode-btn { background: #0f172a; color: white; }
+        
+        .dashboard-content { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 25px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; }
+        
+        .stat-card { background: var(--surface); border-radius: 20px; padding: 20px; box-shadow: var(--card-shadow); border: 1px solid white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 100%; }
+        .stat-val-sub { font-size: 2.5em; font-weight: 800; line-height: 1; }
+        .stat-label { text-transform: uppercase; font-size: 1.2rem; font-weight: 800; letter-spacing: 1.5px; color: #64748b; margin-top: 10px; }
+        
+        .work-section { display: flex; gap: 25px; flex: 1; min-height: 0; }
+        .left-column { flex: 1; display: flex; flex-direction: column; gap: 25px; min-width: 0; }
+        
+        .stat-card.main { background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); border: 1px solid #e2e8f0; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; position: relative; overflow: hidden; }
+        .stat-val-big { font-weight: 800; line-height: 0.9; color: #0f172a; letter-spacing: -3px; font-size: var(--fs-stat); transition: color 0.3s; }
+        .stat-label-main { text-transform: uppercase; font-size: 1.2rem; font-weight: 800; letter-spacing: 1.5px; color: #64748b; margin-top: 15px; display: block; }
+        
+        .scanner-panel { background: var(--surface); border-radius: 20px; box-shadow: var(--card-shadow); padding: 25px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .scan-input { width: 100%; font-size: 1.8rem; font-weight: 700; text-align: center; border: 3px solid #cbd5e1; border-radius: 16px; padding: 12px; outline: none; transition: 0.2s; background: #f8fafc; color: #0f172a; }
+        .scan-input:focus { border-color: var(--accent); background: white; box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.2); }
+        .scan-input:disabled { background: #e2e8f0; border-color: transparent; color: #94a3b8; }
+        
+        .history-panel { flex: 1.4; background: var(--surface); border-radius: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; overflow: hidden; }
+        .history-header { padding: 20px 25px; border-bottom: 1px solid #f1f5f9; font-weight: 800; color: #64748b; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .clean-table { width: 100%; }
+        .clean-table th, .clean-table td { padding: 15px 20px; text-align: center; }
+        .clean-table tr { border-bottom: 1px solid #f1f5f9; }
+        @keyframes flashRow { 0% { background-color: rgba(59, 130, 246, 0.2); } 100% { background-color: transparent; } }
+        .new-row { animation: flashRow 1s ease-out; }
+        
+        #history-table tr td:nth-child(1) { font-size: var(--fs-table); font-weight: 800; color: var(--c-blue); line-height: 1.1; text-align: left; }
+        #history-table tr td:nth-child(2) { font-size: calc(var(--fs-table) * 1.5); font-weight: 900; color: #0f172a; letter-spacing: 2px; font-family: 'JetBrains Mono', monospace; }
+        #history-table tr td:nth-child(3) { font-size: 1.2rem; color: #64748b; font-weight: 600; }
+        .text-blue { color: var(--c-blue); } .text-purple { color: var(--c-purple); } .text-green { color: var(--c-green); }
+        .itr-only { display: none !important; }
+        body.mode-itr .itr-only { display: grid !important; } 
+        body.mode-itr .itr-flex { display: flex !important; }
+        .btn-del-row { border: 1px solid transparent; background: transparent; color: #94a3b8; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: 0.2s; cursor: pointer; font-size: 1.2rem; }
+        .btn-del-row:hover { background: #fee2e2; color: #ef4444; border-color: #ef4444; }
+
+        /* MODALS */
+        .modal-transparent .modal-content { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.4); border-radius: 24px; }
+        .modal-body { max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .modal-nice { border-radius: 24px; border: none; overflow: hidden; background: #f8fafc; }
+        .modal-nice .modal-content { background: #f8fafc; border: none; }
+        .modern-input { background: #ffffff; border: 2px solid #e2e8f0; border-radius: 14px; padding: 14px 18px; font-weight: 700; color: #334155; font-size: 1.1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .modal-dark .modal-content { background: #1e293b; border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 20px; }
+        .modal-dark .modal-header { border-bottom-color: rgba(255,255,255,0.1); }
+        .modal-dark .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+        .input-dark { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 12px; }
+        .input-dark:focus { background: rgba(0,0,0,0.5); color: white; border-color: var(--accent); box-shadow: none; }
+        .input-dark[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+
+        .settings-section { margin-bottom: 25px; }
+        .settings-title { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px; padding-left: 10px; letter-spacing: 1px; }
+        .settings-group { background: rgba(255,255,255,0.7); border-radius: 18px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); }
+        .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-label { display: flex; align-items: center; gap: 12px; font-weight: 700; color: #334155; font-size: 1rem; }
+        .settings-label i { color: var(--accent); font-size: 1.2rem; width: 24px; text-align: center; }
+        .settings-control { flex: 1; max-width: 160px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+        
+        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(59,130,246,0.4); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #e2e8f0; border-radius: 3px; }
+        
+        .segment-control { display: flex; background: rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 5px; position: relative; border: 1px solid rgba(255,255,255,0.1); gap: 5px; margin-bottom: 20px; }
+        .segment-item { flex: 1; position: relative; z-index: 2; }
+        .segment-input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .segment-label { display: flex; align-items: center; justify-content: center; padding: 12px 10px; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #cbd5e1; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-transform: uppercase; letter-spacing: 0.5px; user-select: none; }
+        .segment-label:hover { background: rgba(255,255,255,0.05); color: white; }
+        .segment-input:checked + .segment-label { background: var(--accent); color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); transform: translateY(-1px); }
+
+        .btn-check:checked + .btn-light { background-color: var(--accent); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .nav-pills-custom .nav-link { color: #64748b; background: #f1f5f9; border-radius: 10px; font-weight: 800; padding: 10px 20px; margin-right: 10px; transition: 0.2s; }
+        .nav-pills-custom .nav-link.active { color: #fff; background: var(--accent); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
+
+        .shutdown-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.5s ease-out forwards; }
+        .warning-tri { font-size: 8rem; color: #ef4444; animation: pulse-red 1s infinite; text-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
+        @keyframes pulse-red { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); z-index: 1040; opacity: 0; transition: opacity 0.3s; }
+        .overlay.active { display: block; opacity: 1; }
+        .mobile-header-row { display: none; }
+        .mobile-menu-btn { display: none; }
+
+        /* --- MOBILE OPTIMIZATION --- */
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow: hidden; }
+            .main-layout { padding-bottom: 80px; }
+            .mobile-menu-btn { display: block !important; }
+            .top-bar { display: none; }
+            
+            .sidebar { position: fixed; top: 0; left: 0; height: 100%; width: 85%; max-width: 340px; transform: translateX(-100%); box-shadow: 10px 0 40px rgba(0,0,0,0.5); border-right: none; }
+            .sidebar.active { transform: translateX(0); }
+            .sidebar-inner { width: 100%; padding: 15px; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+            
+            .mobile-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+            
+            .dashboard-content { padding: 12px; padding-bottom: 90px; }
+            
+            /* COMPACT STATS GRID */
+            .stats-grid.itr-only { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+            .stat-card { padding: 8px 4px; min-width: 0; height: auto; border-radius: 12px; }
+            .stat-val-sub { font-size: 1.2rem !important; }
+            .stat-label { font-size: 0.6rem; letter-spacing: 0; margin-top: 4px; }
+            
+            .mobile-view-section { display: none; }
+            .mobile-view-section.active { display: flex; flex-direction: column; gap: 15px; }
+            
+            /* HERO CARD (TOTAL) */
+            .stat-card.main { min-height: 140px; padding: 15px; border-radius: 16px; }
+            .stat-val-big { font-size: 3.5rem !important; line-height: 1; }
+            .stat-label-main { margin-top: 5px; font-size: 0.9rem; }
+            
+            /* INPUT FIELD */
+            .scanner-panel { padding: 15px; border-radius: 16px; }
+            .scan-input { height: 60px; font-size: 1.4rem; border-width: 3px; border-radius: 12px; }
+            
+            /* BOTTOM NAVIGATION */
+            .bottom-nav { 
+                position: fixed; bottom: 0; left: 0; width: 100%; 
+                background: rgba(255,255,255,0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
+                border-top: 1px solid rgba(0,0,0,0.08); 
+                display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; 
+                padding: 10px 5px calc(5px + var(--safe-bottom)) 5px; 
+                z-index: 1060; box-shadow: 0 -5px 25px rgba(0,0,0,0.06); 
+            }
+            .nav-item-mobile { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #64748b; background: none; border: none; gap: 3px; transition: all 0.2s; position: relative; padding: 6px; border-radius: 12px; }
+            .nav-item-mobile i { font-size: 1.4rem; z-index: 2; margin-bottom: 0; }
+            .nav-item-mobile span { font-size: 0.65rem; font-weight: 700; z-index: 2; }
+            .nav-item-mobile.active { color: var(--accent); transform: translateY(-1px); }
+            .nav-item-mobile.active::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 100%; background: rgba(59, 130, 246, 0.1); border-radius: 10px; z-index: 1; }
+            
+            /* HISTORY LIST MOBILE */
+            .clean-table thead { display: none; }
+            .clean-table tr { 
+                display: flex; justify-content: space-between; align-items: center; 
+                background: white; margin-bottom: 8px; border-radius: 12px; padding: 12px; 
+                border: 1px solid #f1f5f9; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            }
+            .clean-table td { display: block; border: none; padding: 0 !important; text-align: left !important; }
+            #history-table tr td:nth-child(1) { font-size: 0.8rem !important; flex: 1; color: var(--c-blue); font-weight: 700; text-transform: uppercase; }
+            #history-table tr td:nth-child(2) { font-size: 1.2rem !important; margin-right: 10px; color: #0f172a; font-weight: 800; font-family: 'JetBrains Mono'; }
+            #history-table tr td:nth-child(3) { display: none; } /* Hide exact time on mobile to save space */
+            
+            .btn-del-row { width: 32px; height: 32px; background: #f8fafc; border: 1px solid #e2e8f0; }
+        }
+        @keyframes fadeInNav { from { opacity: 0; width: 40px; } to { opacity: 1; width: 50px; } }
+        @media (min-width: 769px) { .bottom-nav { display: none; } }
+    </style>
+</head>
+<body class="mode-worker" id="body">
+
+    <!-- OVERLAY -->
+    <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-inner">
+            <div class="mobile-header-row">
+                <button class="btn btn-outline-light fw-bold rounded-pill px-3 py-1" onclick="toggleMode()">
+                    <i class="bi bi-arrow-repeat"></i> <span id="mobModeText">РАБОЧИЙ</span>
+                </button>
+                <button class="btn text-white fs-2 p-0 border-0" onclick="toggleSidebar()">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+
+            <div class="sidebar-header-group">
+                <button class="btn-create" data-bs-toggle="modal" data-bs-target="#addOrderModal">
+                    <i class="bi bi-plus-lg"></i> Новый заказ
+                </button>
+                <button class="btn-all-scans" id="btn-all-scans" onclick="showAllScans()">
+                    <i class="bi bi-list-columns-reverse"></i> Все записи
+                </button>
+                <input type="text" class="sidebar-search" placeholder="Поиск заказа..." id="order-search" oninput="filterOrders()">
+            </div>
+
+            <div class="orders-wrapper" id="orders-container"></div>
+            
+            <div class="sidebar-footer">
+                <button class="btn-tool" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                    <i class="bi bi-gear-fill"></i> Настройки
+                </button>
+                <button class="btn-tool" data-bs-toggle="modal" data-bs-target="#exportModal">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Скачать отчет
+                </button>
+                <div class="itr-only">
+                    <button class="btn-tool" onclick="openChartModal()">
+                        <i class="bi bi-pie-chart-fill"></i> Статистика
+                    </button>
+                    <button class="btn-tool text-danger" onclick="confirmShutdown()">
+                        <i class="bi bi-power"></i> Выключить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-layout" id="mainLayout">
+        <div class="top-bar">
+            <button class="mobile-menu-btn" id="menuBtn" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+            <button class="mode-btn" id="modeBtn" onclick="toggleMode()">
+                 <span class="mode-text-label">Режим: </span><span id="modeText">Рабочий</span>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+                <div class="info-block text-end me-2">
+                    <div class="ip-display">IP: {{ server_url.split('://')[1] }}</div>
+                    <div class="users-counter itr-only" id="users-online">Онлайн: <span id="online-count">0</span></div>
+                </div>
+                <button class="btn btn-light border p-2" data-bs-toggle="modal" data-bs-target="#qrModal">
+                    <i class="bi bi-qr-code fs-4"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <div class="stats-grid itr-only">
+                <div class="stat-card">
+                    <div class="stat-val-sub text-blue" id="stat-c1">0</div>
+                    <div class="stat-label">Линия 1</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val-sub text-purple" id="stat-c2">0</div>
+                    <div class="stat-label">Линия 2</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val-sub text-green" id="stat-stapel">0</div>
+                    <div class="stat-label">Стапель</div>
+                </div>
+            </div>
+
+            <div class="work-section">
+                <!-- LEFY COLUMN -->
+                <div class="left-column mobile-view-section active" id="mob-home">
+                    <div class="stat-card main">
+                        <div class="stat-val-big" id="stat-total">0</div>
+                        <div class="stat-label-main" id="stat-total-label">Всего сегодня</div>
+                    </div>
+
+                    <div class="scanner-panel">
+                        <div id="scan-status" class="fw-bold text-muted text-uppercase mb-3 small" style="letter-spacing: 1px;">Выберите заказ</div>
+                        <input type="text" id="serial-input" class="scan-input" placeholder="СКАНИРОВАТЬ" disabled autocomplete="off">
+                        <div id="scan-msg" class="mt-3 fw-bold small text-center" style="height: 24px; font-size: 1.2rem;"></div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN -->
+                <div class="history-panel mobile-view-section" id="mob-history">
+                    <div class="history-header">
+                        <span>ИСТОРИЯ</span>
+                    </div>
+                    <div class="table-scroll" style="overflow-y:auto; flex:1;">
+                        <table class="clean-table">
+                            <thead>
+                                <tr>
+                                    <th width="35%" style="text-align: left;">ЗАКАЗ</th>
+                                    <th width="40%">SN</th>
+                                    <th width="20%">ВРЕМЯ</th>
+                                    <th width="5%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW BOTTOM NAV (MOBILE) -->
+    <div class="bottom-nav">
+        <button class="nav-item-mobile" onclick="openChartModal()">
+            <i class="bi bi-bar-chart-fill"></i>
+            <span>Стат</span>
+        </button>
+        <button class="nav-item-mobile active" onclick="switchMobileTab('home')">
+            <i class="bi bi-upc-scan"></i>
+            <span>Скан</span>
+        </button>
+        <button class="nav-item-mobile" onclick="toggleSidebar()"> 
+            <i class="bi bi-list-task"></i>
+            <span>Меню</span>
+        </button>
+        <button class="nav-item-mobile" data-bs-toggle="modal" data-bs-target="#settingsModal"> 
+            <i class="bi bi-gear-fill"></i>
+            <span>Настр</span>
+        </button>
+    </div>
+
+    <!-- MODALS -->
+    <div class="modal fade" id="qrModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-4 p-4 text-center"><div id="qrcode" class="d-flex justify-content-center mb-3"></div><div class="fw-bold font-monospace" style="word-break:break-all;">{{ server_url }}</div></div></div></div>
+    
+    <!-- SETTINGS MODAL -->
+    <div class="modal fade modal-transparent" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content shadow">
+                <div class="modal-header border-0 pb-0 pt-4 px-4">
+                    <h4 class="fw-bold m-0 text-dark">Настройки</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="settings-section">
+                        <div class="settings-title">Система</div>
+                        <div class="settings-group">
+                            <div class="settings-row" onclick="toggleMode()">
+                                <div class="settings-label"><i class="bi bi-person-badge-fill"></i> Режим</div>
+                                <div class="fw-bold text-primary" id="modalModeText">РАБОЧИЙ</div>
+                            </div>
+                            <div class="settings-row">
+                                <div class="settings-label"><i class="bi bi-volume-up-fill"></i> Звук</div>
+                                <div class="settings-control">
+                                    <input type="range" min="0" max="1" step="0.1" id="volRange" oninput="updateVolume(this.value)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <div class="settings-title">График работы</div>
+                        <div class="settings-group p-3">
+                            <div class="d-flex gap-2 mb-3">
+                                <div class="flex-grow-1">
+                                    <label class="small text-muted fw-bold">Начало</label>
+                                    <input type="time" id="set-shift-start" class="form-control modern-input text-center">
+                                </div>
+                                <div class="flex-grow-1">
+                                    <label class="small text-muted fw-bold">Конец</label>
+                                    <input type="time" id="set-shift-end" class="form-control modern-input text-center">
+                                </div>
+                            </div>
+                            <div class="settings-title mt-2 mb-2">Перерывы</div>
+                            <div id="breaks-container"></div>
+                            <button class="btn btn-outline-primary w-100 mt-2 fw-bold" onclick="addBreakRow()">+ Добавить перерыв</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-title">Интерфейс</div>
+                        <div class="settings-group">
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-123"></i> Главная цифра</div><div class="settings-control"><input type="range" min="3" max="45" step="0.5" id="rng-stat" oninput="setFont('stat', this.value)"></div></div>
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-menu-button-wide"></i> Шрифт меню</div><div class="settings-control"><input type="range" min="0.8" max="1.4" step="0.05" id="rng-sidebar" oninput="setFont('sidebar', this.value)"></div></div>
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-table"></i> Шрифт таблицы</div><div class="settings-control"><input type="range" min="1" max="2.5" step="0.1" id="rng-table" oninput="setFont('table', this.value)"></div></div>
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-phone"></i> Меню (Моб)</div><div class="settings-control"><input type="range" min="1.2" max="2.5" step="0.1" id="rng-nav" oninput="setNavSize(this.value)"></div></div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid mt-4">
+                        <button class="btn btn-primary rounded-4 py-3 fw-bold shadow-sm" onclick="saveAndCloseSettings()">Сохранить и закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHUTDOWN MODAL -->
+    <div class="modal fade" id="shutdownModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-nice shadow border-0" style="background: #1e293b;">
+                <div class="modal-body p-4 text-center text-white">
+                    <div class="mb-3"><div style="width: 70px; height: 70px; background: rgba(239, 68, 68, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;"><i class="bi bi-power" style="font-size: 2.5rem; color: #ef4444;"></i></div></div>
+                    <h4 class="fw-bold mb-2">Выключение</h4><p class="text-white-50 mb-4">Вы действительно хотите остановить сервер?</p>
+                    <div class="d-flex gap-3"><button class="btn btn-outline-light flex-grow-1 py-3 fw-bold rounded-4 border-0" style="background: rgba(255,255,255,0.1);" data-bs-dismiss="modal">Отмена</button><button class="btn btn-danger flex-grow-1 py-3 fw-bold rounded-4" onclick="confirmShutdown()">ВЫКЛЮЧИТЬ</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GENERIC DELETE MODAL -->
+    <div class="modal fade" id="confirmModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-nice shadow border-0" style="background: #1e293b;">
+                <div class="modal-body p-4 text-center text-white">
+                    <div class="mb-3"><div style="width: 70px; height: 70px; background: rgba(239, 68, 68, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;"><i class="bi bi-trash-fill" style="font-size: 2.5rem; color: #ef4444;"></i></div></div>
+                    <h4 class="fw-bold mb-2" id="confirmTitle">Удаление</h4><p class="text-white-50 mb-4" id="confirmMsg">Вы уверены?</p>
+                    <div class="d-flex gap-3"><button class="btn btn-outline-light flex-grow-1 py-3 fw-bold rounded-4 border-0" style="background: rgba(255,255,255,0.1);" data-bs-dismiss="modal">Отмена</button><button id="confirmBtnAction" class="btn btn-danger flex-grow-1 py-3 fw-bold rounded-4">УДАЛИТЬ</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addOrderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-nice shadow p-4">
+                <div class="text-center mb-4"><h4 class="fw-bold">Новый заказ</h4></div>
+                <div class="mb-3"><input type="text" id="new-name" class="form-control modern-input" placeholder="Номер заказа"></div>
+                <div class="mb-4"><input type="number" id="new-target" class="form-control modern-input" placeholder="Количество"></div>
+                <div class="row g-2 mb-4">
+                    <div class="col-4"><input type="radio" class="btn-check" name="ntype" id="t1" value="conveyor_1" checked><label class="btn btn-outline-primary w-100 fw-bold py-3 rounded-4" for="t1">Л1</label></div>
+                    <div class="col-4"><input type="radio" class="btn-check" name="ntype" id="t2" value="conveyor_2"><label class="btn btn-outline-primary w-100 fw-bold py-3 rounded-4" for="t2">Л2</label></div>
+                    <div class="col-4"><input type="radio" class="btn-check" name="ntype" id="t3" value="stapel"><label class="btn btn-outline-success w-100 fw-bold py-3 rounded-4" for="t3">СТ</label></div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center p-3 rounded-4 mb-4 bg-white border">
+                    <div class="fw-bold">Дубликаты</div>
+                    <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="allow-dups" style="width: 3em; height: 1.5em;"></div>
+                </div>
+                <button class="btn btn-primary w-100 fw-bold py-3 rounded-4 fs-5" onclick="createOrder()">СОЗДАТЬ</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="editOrderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-nice shadow p-4">
+                <div class="text-center mb-4"><h4 class="fw-bold">Редактирование</h4></div>
+                <input type="hidden" id="edit-id">
+                <div class="mb-3"><label class="small text-muted fw-bold ms-2">Заказ</label><input type="text" id="edit-name" class="form-control modern-input"></div>
+                <div class="mb-4"><label class="small text-muted fw-bold ms-2">План</label><input type="number" id="edit-target" class="form-control modern-input"></div>
+                <div class="mb-4 pt-3 border-top"><label class="small text-muted fw-bold ms-2">Факт (Коррекция)</label><input type="number" id="edit-scanned" class="form-control modern-input" style="background: #eef2ff;"></div>
+                <button class="btn btn-primary w-100 fw-bold py-3 rounded-4 fs-5" onclick="saveOrderEdit()">СОХРАНИТЬ</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade modal-dark" id="exportModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4"><h5 class="fw-bold m-0">Выгрузка отчета</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="d-flex gap-2 mb-4"><div class="flex-grow-1"><label class="small text-white-50 fw-bold mb-1 ps-1">С</label><input type="date" id="export-date-from" class="form-control input-dark py-2 text-center fs-6"></div><div class="flex-grow-1"><label class="small text-white-50 fw-bold mb-1 ps-1">ПО</label><input type="date" id="export-date-to" class="form-control input-dark py-2 text-center fs-6"></div></div>
+                
+                <div class="segment-control">
+                    <div class="segment-item"><input type="radio" name="btnExportType" id="ex-l1" value="line1_2" class="segment-input" checked><label for="ex-l1" class="segment-label">Линии</label></div>
+                    <div class="segment-item"><input type="radio" name="btnExportType" id="ex-st" value="stapel" class="segment-input"><label for="ex-st" class="segment-label">Стапель</label></div>
+                    <div class="segment-item"><input type="radio" name="btnExportType" id="ex-all" value="all" class="segment-input"><label for="ex-all" class="segment-label">Все</label></div>
+                </div>
+
+                <div class="d-grid gap-2 mt-4"><button class="btn btn-primary fw-bold py-3 rounded-4" onclick="downloadExcel()"><i class="bi bi-download me-2"></i> Скачать Excel</button></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ANALYTICS MODAL -->
+    <div class="modal fade" id="chartModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow p-4 border-0" style="background:#f8fafc;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <ul class="nav nav-pills nav-pills-custom" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-analytics">АНАЛИТИКА</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-forecast" onclick="initForecastTab()">ПРОГНОЗ</button></li>
+                    </ul>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tab-analytics">
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-white border fw-bold" onclick="setAnalyticsDate('today')">Сегодня</button>
+                            <button class="btn btn-white border fw-bold" onclick="setAnalyticsDate('yesterday')">Вчера</button>
+                            <input type="date" id="an-date-from" class="form-control" style="width: auto;" onchange="loadAnalytics()">
+                            <input type="date" id="an-date-to" class="form-control" style="width: auto;" onchange="loadAnalytics()">
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6"><div class="p-3 bg-white rounded-4 shadow-sm"><div class="small text-muted fw-bold">ПРОИЗВЕДЕНО</div><div class="fs-2 fw-bold text-primary" id="an-total">0</div></div></div>
+                            <div class="col-6"><div class="p-3 bg-white rounded-4 shadow-sm"><div class="small text-muted fw-bold">СКОРОСТЬ (ср)</div><div class="fs-2 fw-bold text-dark" id="an-speed">0</div></div></div>
+                        </div>
+                        <div class="bg-white p-3 rounded-4 shadow-sm" style="height:300px;"><canvas id="prodChart"></canvas></div>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="tab-forecast">
+                        <div class="bg-white p-4 rounded-4 shadow-sm text-center">
+                            
+                            <div class="d-flex justify-content-center mb-4">
+                                <div class="btn-group bg-light rounded-pill p-1 border" role="group">
+                                    <input type="radio" class="btn-check" name="forecastFilter" id="ff-active" value="active" checked onchange="initForecastTab()">
+                                    <label class="btn btn-sm btn-light rounded-pill fw-bold px-3 border-0" for="ff-active">В работе</label>
+                                    
+                                    <input type="radio" class="btn-check" name="forecastFilter" id="ff-all" value="all" onchange="initForecastTab()">
+                                    <label class="btn btn-sm btn-light rounded-pill fw-bold px-3 border-0" for="ff-all">Все</label>
+                                </div>
+                            </div>
+
+                            <select id="forecast-order-select" class="form-select modern-input mb-4" onchange="calcForecast()">
+                                <option value="" selected disabled>-- Список заказов --</option>
+                            </select>
+                            
+                            <div id="forecast-result" class="d-none">
+                                <div class="row g-3">
+                                    <div class="col-6"><div class="p-3 bg-light rounded-3"><div class="small text-muted fw-bold text-uppercase" id="fc-label-rem">Осталось</div><div class="fs-2 fw-bold text-primary" id="fc-remaining">0</div><div class="small text-muted">шт</div></div></div>
+                                    <div class="col-6"><div class="p-3 bg-light rounded-3"><div class="small text-muted fw-bold text-uppercase">Скорость</div><div class="fs-2 fw-bold text-dark" id="fc-speed">0</div><div class="small text-muted">шт/час</div></div></div>
+                                </div>
+                                <div class="mt-4 pt-4 border-top"><div class="small text-muted fw-bold text-uppercase mb-1" id="fc-label-date">Расчетное время</div><div class="fs-1 fw-bold text-success lh-1 mb-2" id="fc-date">--.-- --:--</div><div class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fs-6" id="fc-delta">--</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const el = (id) => document.getElementById(id);
+    function escapeHtml(text) { if (text == null) return ""; return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function getLocalDateString(offsetDays=0) { const d = new Date(); d.setDate(d.getDate() + offsetDays); const offset = d.getTimezoneOffset() * 60000; return new Date(d.getTime() - offset).toISOString().split('T')[0]; }
+
+    let selId = localStorage.getItem('sk_id_fin11');
+    let selName = localStorage.getItem('sk_name_fin11');
+    let userMode = localStorage.getItem('sk_mode') || 'worker';
+    
+    let st = { stat: 7, sidebar: 1, table: 1.5, nav: 1.6, vol: 1, header: 1, 'card-title': 1, 'card-meta': 0.85, shift_start: '08:00', shift_end: '20:00', breaks: [] };
+    let myChart = null; let scanTimer; const SCAN_DELAY = 200; let lastOrdersHtml = ""; let isScanning = false; let cachedOrders = []; let cachedHistory = []; 
+    let expandedGroups = JSON.parse(localStorage.getItem('sk_expanded_groups') || '["TODAY", "INWORK"]');
+    
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = wsProto + '//' + window.location.host + '/ws';
+    let socket;
+
+    function connectWS() {
+        socket = new WebSocket(wsUrl);
+        socket.onopen = () => { console.log("WS Connected"); };
+        socket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'update_data') {
+                const d = msg.data;
+                if (!d || !d.stats) return; 
+                cachedOrders = d.orders || []; 
+                cachedHistory = d.history || []; 
+                updateGlobalStats(d.stats, d.online_count); 
+                if (document.getElementById('order-search').value.length < 3) renderSidebar(d.orders); 
+                renderHistoryTable();
+            } else if (msg.type === 'scan_event') {
+                const d = msg.data;
+                if (!d) return; 
+                if(d.stats) updateGlobalStats(d.stats, null); 
+                
+                const order = cachedOrders.find(o => o.id == d.order_id); 
+                if (order) { 
+                    order.local_scanned = d.order_total; 
+                    order.global_scanned = d.order_total; 
+                    const txtEl = document.getElementById(`ord-txt-${d.order_id}`); 
+                    const progEl = document.getElementById(`ord-prog-${d.order_id}`); 
+                    const targetDisplay = order.target_qty > 0 ? order.target_qty : '∞'; 
+                    if(txtEl) txtEl.innerText = `${d.order_total} / ${targetDisplay}`; 
+                    if(progEl) { let pct = order.target_qty > 0 ? Math.min(100, (d.order_total / order.target_qty) * 100) : 0; progEl.style.width = pct + '%'; } 
+                    if(order.target_qty > 0 && d.order_total >= order.target_qty) { 
+                        const card = document.getElementById(`ord-card-${d.order_id}`); 
+                        if(card) { card.classList.remove('status-work'); card.classList.add('status-done'); } 
+                    } 
+                } 
+                if (selId == d.order_id) { document.getElementById('stat-total').innerText = d.order_total; } 
+                if (d.scan_entry) { 
+                    const rowHtml = createHistoryRow(d.scan_entry, true); 
+                    const tbody = document.getElementById('history-table'); 
+                    if(tbody) { 
+                        if (!selId || selId == d.order_id) { 
+                            tbody.insertAdjacentHTML('afterbegin', rowHtml); 
+                            if (tbody.children.length > 50) tbody.removeChild(tbody.lastElementChild); 
+                        } 
+                    } 
+                }
+                
+                // AUTO UPDATE FORECAST
+                const forecastModal = document.getElementById('chartModal');
+                if (forecastModal && forecastModal.classList.contains('show')) {
+                     const selectedOid = document.getElementById('forecast-order-select').value;
+                     if (selectedOid == d.order_id) calcForecast(); 
+                }
+            }
+        };
+        socket.onclose = () => { setTimeout(connectWS, 2000); };
+    }
+
+    const isMobile = () => window.innerWidth <= 768;
+    const sndOk = new Audio("https://actions.google.com/sounds/v1/science_fiction/scifi_industrial_alarm.ogg"); 
+    const sndErr = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg"); 
+
+    document.addEventListener("DOMContentLoaded", () => {
+        connectWS();
+        
+        document.getElementById('export-date-from').value = getLocalDateString();
+        document.getElementById('export-date-to').value = getLocalDateString();
+        document.getElementById('an-date-from').value = getLocalDateString();
+        document.getElementById('an-date-to').value = getLocalDateString();
+        
+        fetch('/action/get_settings').then(r=>r.json()).then(d => {
+            if(d.shift_start) st.shift_start = d.shift_start;
+            if(d.shift_end) st.shift_end = d.shift_end;
+            if(d.breaks) st.breaks = JSON.parse(d.breaks || '[]');
+            applySettings();
+        });
+
+        applyMode(userMode); updateUI(); 
+        new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 120, height: 120 });
+        const ipEls = document.querySelectorAll('.ip-display');
+        ipEls.forEach(el => el.innerText = "IP: " + window.location.hostname);
+
+        const inp = document.getElementById('serial-input');
+        
+        document.body.addEventListener('click', (e) => { if(selId && !e.target.closest('input, button, .modal, .sidebar') && !isMobile()) { inp.focus(); } });
+        
+        inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(scanTimer);
+                submitScan();
+            }
+        });
+
+        inp.addEventListener('input', () => { 
+            clearTimeout(scanTimer); 
+            document.body.classList.remove('bg-error-persistent'); 
+            document.getElementById('scan-msg').innerHTML = ''; 
+            if (inp.value.trim().length > 0) scanTimer = setTimeout(submitScan, SCAN_DELAY); 
+        });
+    });
+
+    async function submitScan() { 
+        const inp = document.getElementById('serial-input'); 
+        const val = inp.value.trim(); 
+        if(!val || !selId) return; 
+        inp.value = ''; 
+        
+        try { 
+            const res = await fetch('/action/scan', { 
+                method: 'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body: JSON.stringify({serial: val, order_id: parseInt(selId)}) 
+            }); 
+            
+            const d = await res.json(); 
+            
+            if(d.status === 'success') { 
+                sndOk.currentTime=0; 
+                sndOk.play().catch(()=>{}); 
+                document.getElementById('scan-msg').innerHTML = ''; 
+            } else { 
+                sndErr.currentTime=0; 
+                sndErr.play().catch(()=>{}); 
+                document.body.classList.add('bg-error-persistent'); 
+                document.getElementById('scan-msg').innerHTML = `<span class="text-white">${d.msg || 'ОШИБКА'}</span>`; 
+            } 
+        } catch(e) {
+            console.error(e);
+        } 
+        
+        if (!isMobile()) inp.focus(); 
+    }
+
+    function updateGlobalStats(stats, online) { 
+        if (!selId) { 
+            document.getElementById('stat-total').innerText = stats.total ?? 0; 
+            document.getElementById('stat-total-label').innerText = "Всего сегодня"; 
+        } else { 
+            const o = cachedOrders.find(x => x.id == selId); 
+            if(o) { 
+                document.getElementById('stat-total').innerText = o.local_scanned; 
+                document.getElementById('stat-total-label').innerText = o.name; 
+            } 
+        } 
+        document.getElementById('stat-c1').innerText = stats.c1 ?? 0; 
+        document.getElementById('stat-c2').innerText = stats.c2 ?? 0; 
+        document.getElementById('stat-stapel').innerText = stats.stapel ?? 0; 
+        if (online !== undefined && online !== null) document.getElementById('online-count').innerText = online; 
+    }
+
+    function addBreakRow(start="", end="") {
+        const div = document.createElement('div');
+        div.className = "d-flex gap-2 mb-2 break-row";
+        div.innerHTML = `<input type="time" class="form-control modern-input text-center" value="${start}"><span class="align-self-center">-</span><input type="time" class="form-control modern-input text-center" value="${end}"><button class="btn btn-light text-danger" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button>`;
+        document.getElementById('breaks-container').appendChild(div);
+    }
+    function applySettings() {
+        document.documentElement.style.setProperty('--fs-stat', st.stat + 'rem'); document.documentElement.style.setProperty('--fs-sidebar', st.sidebar + 'rem'); document.documentElement.style.setProperty('--fs-table', st.table + 'rem'); document.documentElement.style.setProperty('--fs-nav-icon', st.nav + 'rem');
+        if(st.header) document.documentElement.style.setProperty('--fs-header', st.header + 'rem');
+        document.getElementById('rng-stat').value = st.stat; document.getElementById('rng-sidebar').value = st.sidebar; document.getElementById('rng-table').value = st.table; if(document.getElementById('rng-nav')) document.getElementById('rng-nav').value = st.nav; document.getElementById('volRange').value = st.vol;
+        document.getElementById('set-shift-start').value = st.shift_start || "08:00"; document.getElementById('set-shift-end').value = st.shift_end || "20:00";
+        document.getElementById('breaks-container').innerHTML = '';
+        (st.breaks || []).forEach(b => addBreakRow(b.start, b.end));
+        sndOk.volume = st.vol; sndErr.volume = st.vol;
+    }
+    function saveAndCloseSettings() {
+        st.shift_start = document.getElementById('set-shift-start').value;
+        st.shift_end = document.getElementById('set-shift-end').value;
+        st.breaks = [];
+        document.querySelectorAll('.break-row').forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            if(inputs[0].value && inputs[1].value) st.breaks.push({start: inputs[0].value, end: inputs[1].value});
+        });
+        fetch('/action/save_settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({shift_start: st.shift_start, shift_end: st.shift_end, breaks: st.breaks}) });
+        bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+    }
+    function setFont(key, val) { st[key] = val; document.documentElement.style.setProperty(`--fs-${key}`, val + 'rem'); }
+    function setNavSize(val) { st.nav = val; document.documentElement.style.setProperty('--fs-nav-icon', val + 'rem'); }
+    function updateVolume(val) { st.vol = val; sndOk.volume = val; sndErr.volume = val; }
+
+    function openChartModal() { new bootstrap.Modal(document.getElementById('chartModal')).show(); loadAnalytics(); }
+    function setAnalyticsDate(type) {
+        if(type==='today') { document.getElementById('an-date-from').value = getLocalDateString(); document.getElementById('an-date-to').value = getLocalDateString(); }
+        else if(type==='yesterday') { document.getElementById('an-date-from').value = getLocalDateString(-1); document.getElementById('an-date-to').value = getLocalDateString(-1); }
+        loadAnalytics();
+    }
+    async function loadAnalytics() {
+        const dFrom = document.getElementById('an-date-from').value;
+        const dTo = document.getElementById('an-date-to').value;
+        const res = await fetch(`/api/analytics_data?from=${dFrom}&to=${dTo}&order_id=${selId || ''}`);
+        const data = await res.json();
+        document.getElementById('an-total').innerText = data.total;
+        document.getElementById('an-speed').innerText = data.speed;
+        if (myChart) { myChart.destroy(); myChart = null; }
+        const ctx = document.getElementById('prodChart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.chart_labels,
+                datasets: [{
+                    label: data.chart_type === 'hour' ? 'Шт/час' : 'Шт/день',
+                    data: data.chart_values,
+                    backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                    borderRadius: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    function initForecastTab() {
+        const filterEl = document.querySelector('input[name="forecastFilter"]:checked');
+        const filter = filterEl ? filterEl.value : 'active';
+        
+        const sel = document.getElementById('forecast-order-select');
+        sel.innerHTML = '<option value="" selected disabled>-- Выберите заказ --</option>';
+        
+        let list = [];
+        if (filter === 'active') {
+            list = cachedOrders.filter(o => o.target_qty > 0 && o.global_scanned < o.global_target);
+        } else {
+            list = cachedOrders.filter(o => o.target_qty > 0);
+        }
+        
+        list.sort((a,b) => b.id - a.id);
+
+        list.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.id;
+            let label = o.name;
+            if (o.global_scanned >= o.target_qty) label += " (Готов)";
+            opt.innerText = label;
+            
+            if(selId == o.id) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        
+        if(sel.value) calcForecast();
+        else document.getElementById('forecast-result').classList.add('d-none');
+    }
+
+    async function calcForecast() {
+        const oid = document.getElementById('forecast-order-select').value;
+        if(!oid) return;
+        
+        const order = cachedOrders.find(o => o.id == oid);
+        const isDone = order && order.global_scanned >= order.target_qty;
+
+        const res = await fetch(`/api/forecast_order?order_id=${oid}`);
+        const data = await res.json();
+        
+        const elRes = document.getElementById('forecast-result');
+        elRes.classList.remove('d-none');
+
+        const labelDate = document.getElementById('fc-label-date');
+        const valDate = document.getElementById('fc-date');
+        const valDelta = document.getElementById('fc-delta');
+
+        if (isDone) {
+            document.getElementById('fc-remaining').innerText = "0";
+            document.getElementById('fc-speed').innerText = data.speed;
+            
+            labelDate.innerText = "Статус";
+            valDate.innerText = "ВЫПОЛНЕН";
+            valDate.className = "fs-1 fw-bold text-primary lh-1 mb-2";
+            valDelta.innerText = "План закрыт";
+            valDelta.className = "badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fs-6";
+        } else {
+            document.getElementById('fc-remaining').innerText = data.remaining;
+            document.getElementById('fc-speed').innerText = data.speed;
+            
+            labelDate.innerText = "Расчетное завершение";
+            valDate.innerText = data.completion_date;
+            valDate.className = "fs-1 fw-bold text-success lh-1 mb-2";
+            valDelta.innerText = data.human_delta;
+            valDelta.className = "badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fs-6";
+        }
+    }
+
+    function filterOrders() { const val = document.getElementById('order-search').value.trim(); const matches = cachedOrders.filter(o => o.name && o.name.toLowerCase().includes(val.toLowerCase())); renderSidebar(matches); }
+    function renderSidebar(orders) {
+        if (!orders) return;
+        let groups = { "TODAY": [], "INWORK": [], "YESTERDAY": [] }; let monthGroups = {};
+        const now = new Date(); const todayStr = now.toDateString(); const yesterday = new Date(); yesterday.setDate(now.getDate() - 1); const yestStr = yesterday.toDateString();
+        orders.forEach(o => {
+            let oDateStr = new Date(o.created_at || now).toDateString();
+            if (oDateStr === todayStr) groups["TODAY"].push(o); 
+            else if (o.target_qty > 0 && o.global_scanned < o.global_target && o.status === 'active') groups["INWORK"].push(o);
+            else if (oDateStr === yestStr) groups["YESTERDAY"].push(o); 
+            else { let mKey = new Date(o.created_at).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }); if (!monthGroups[mKey]) monthGroups[mKey] = []; monthGroups[mKey].push(o); }
+        });
+        let html = "";
+        const buildGroup = (key, list, title, cls='') => {
+            if(list.length === 0) return;
+            const isOpen = expandedGroups.includes(key);
+            html += `<div class="group-header ${isOpen ? 'open' : ''}" id="group-${key}"><div class="group-summary ${cls}" onclick="toggleGroup('${key}')">${title}</div><div class="group-content">`;
+            list.forEach(o => html += renderOrderCard(o)); html += `</div></div>`;
+        };
+        buildGroup("TODAY", groups["TODAY"], "СЕГОДНЯ", "today"); buildGroup("INWORK", groups["INWORK"], "В РАБОТЕ", "inwork"); buildGroup("YESTERDAY", groups["YESTERDAY"], "ВЧЕРА");
+        Object.keys(monthGroups).forEach(key => buildGroup(key, monthGroups[key], key));
+        if (html !== lastOrdersHtml) { document.getElementById('orders-container').innerHTML = html; lastOrdersHtml = html; }
+    }
+    function renderOrderCard(o) {
+        const act = o.id == selId ? 'active' : '';
+        let pct = o.global_target > 0 ? Math.min(100, (o.global_scanned / o.global_target) * 100) : 0;
+        let targetDisplay = o.target_qty > 0 ? o.target_qty : '∞';
+        let wmText = o.type === 'conveyor_1' ? "Л1" : (o.type === 'conveyor_2' ? "Л2" : "СТ");
+        return `<div id="ord-card-${o.id}" class="order-card ${act} ${o.target_qty > 0 && o.global_scanned >= o.target_qty ? 'status-done' : 'status-work'}" onclick="selectOrder(${o.id}, '${escapeHtml(o.name)}')" ondblclick="openEditOrderModal(${o.id}, '${escapeHtml(o.name)}', ${o.target_qty}, ${o.global_scanned})">
+            <div id="ord-prog-${o.id}" class="order-progress-bg" style="width: ${pct}%"></div><div class="watermark-loc">${wmText}</div>
+            <div class="order-content-wrap"><div class="order-top-row"><div class="order-title">${escapeHtml(o.name)}</div></div><div class="order-meta"><span id="ord-txt-${o.id}">${o.global_scanned} / ${targetDisplay}</span></div></div>
+            <div class="order-controls"><button class="btn-mini" onclick="openEditOrderModal(${o.id}, '${escapeHtml(o.name)}', ${o.target_qty}, ${o.global_scanned}, event)"><i class="bi bi-pencil-fill"></i></button><button class="btn-mini del" onclick="deleteOrderDirectly(${o.id}, event)"><i class="bi bi-trash-fill"></i></button></div></div>`;
+    }
+    function createHistoryRow(h, isNew=false) { return `<tr class="${isNew?'new-row':''}"><td class="text-blue fw-bold small text-uppercase">${escapeHtml(h.order_name)}</td><td class="fw-bold">${escapeHtml(h.serial)}</td><td class="text-muted small">${escapeHtml(h.timestamp.split(' ')[1]||h.timestamp)}</td><td class="text-end"><button class="btn-del-row" onclick="deleteScan(${h.id}, event)"><i class="bi bi-x-lg"></i></button></td></tr>`; }
+    function toggleGroup(key) { const el = document.getElementById('group-' + key); if(el) el.classList.toggle('open'); const idx = expandedGroups.indexOf(key); if (el && el.classList.contains('open')) { if(idx === -1) expandedGroups.push(key); } else { if(idx !== -1) expandedGroups.splice(idx, 1); } localStorage.setItem('sk_expanded_groups', JSON.stringify(expandedGroups)); }
+    function toggleSidebar() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('overlay'); if (isMobile()) { sb.classList.toggle('active'); ov.classList.toggle('active'); } else { sb.classList.toggle('collapsed'); } }
+    function toggleMode() { userMode = userMode === 'worker' ? 'itr' : 'worker'; localStorage.setItem('sk_mode', userMode); applyMode(userMode); }
+    function applyMode(mode) { document.body.className = `mode-${mode}`; let txt = mode === 'worker' ? 'РАБОЧИЙ' : 'ИТР'; document.getElementById('modeText').innerText = txt; document.getElementById('mobModeText').innerText = txt; document.getElementById('modalModeText').innerText = txt; }
+    function renderHistoryTable() { const tbody = document.getElementById('history-table'); let d = cachedHistory; if (selId) d = cachedHistory.filter(h => h.order_id == selId); tbody.innerHTML = d.map(h => createHistoryRow(h)).join(''); }
+    
+    function selectOrder(id, name) { selId = id; selName = name; localStorage.setItem('sk_id_fin11', id); localStorage.setItem('sk_name_fin11', name); updateUI(); document.querySelectorAll('.order-card.active').forEach(e => e.classList.remove('active')); const newActive = document.getElementById(`ord-card-${id}`); if(newActive) newActive.classList.add('active'); renderHistoryTable(); if(isMobile()) { document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); switchMobileTab('home'); } }
+    function showAllScans() { selId = null; selName = null; localStorage.removeItem('sk_id_fin11'); document.getElementById('btn-all-scans').classList.add('active'); updateUI(); renderSidebar(cachedOrders); renderHistoryTable(); if(isMobile()) { document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); switchMobileTab('history'); } }
+    function updateUI() { const status = document.getElementById('scan-status'); const inp = document.getElementById('serial-input'); if(selId) { const o = cachedOrders.find(x => x.id == selId); if(o) selName = o.name; status.innerHTML = `В РАБОТЕ: <span class="text-blue text-uppercase">${escapeHtml(selName)}</span>`; inp.disabled = false; inp.placeholder = "СКАНИРУЙТЕ..."; if (!isMobile()) setTimeout(() => inp.focus(), 100); const stats = cachedOrders.find(x => x.id == selId); if(stats) { document.getElementById('stat-total').innerText = stats.local_scanned; document.getElementById('stat-total-label').innerText = stats.name; } } else { status.innerHTML = "ВЫБЕРИТЕ ЗАКАЗ"; inp.disabled = true; inp.placeholder = ""; } }
+    
+    async function createOrder() { 
+        const name = document.getElementById('new-name').value.trim(); 
+        const target = document.getElementById('new-target').value; 
+        const type = document.querySelector('input[name="ntype"]:checked').value; 
+        const allowDups = document.getElementById('allow-dups').checked; 
+        if(!name) return; 
+        await fetch('/action/add_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, type, target, allow_dups: allowDups}) }); 
+        bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide(); 
+        document.getElementById('new-name').value = ''; 
+    }
+    
+    function openEditOrderModal(id, name, target, scanned, e) { if(e) e.stopPropagation(); document.getElementById('edit-id').value = id; document.getElementById('edit-name').value = name; document.getElementById('edit-target').value = target; document.getElementById('edit-scanned').value = scanned; new bootstrap.Modal(document.getElementById('editOrderModal')).show(); }
+    async function saveOrderEdit() { 
+        const id = parseInt(document.getElementById('edit-id').value);
+        const name = document.getElementById('edit-name').value;
+        const target = parseInt(document.getElementById('edit-target').value);
+        const scanned = parseInt(document.getElementById('edit-scanned').value);
+        await fetch('/action/edit_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, name, target, scanned_count: scanned}) });
+        bootstrap.Modal.getInstance(document.getElementById('editOrderModal')).hide(); 
+    }
+    
+    let pendingDeleteAction = null;
+    function showConfirmModal(title, msg, action) { document.getElementById('confirmTitle').innerText = title; document.getElementById('confirmMsg').innerText = msg; pendingDeleteAction = action; new bootstrap.Modal(document.getElementById('confirmModal')).show(); }
+    document.getElementById('confirmBtnAction').addEventListener('click', () => { if(pendingDeleteAction) pendingDeleteAction(); bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide(); });
+    async function deleteOrderDirectly(id, e) { if(e) e.stopPropagation(); showConfirmModal("Удалить заказ?", "Данные будут утеряны.", async () => { await fetch('/action/delete_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: parseInt(id)}) }); }); }
+    function deleteScan(id, e) { if (e) e.stopPropagation(); showConfirmModal("Удалить запись?", "Отменить нельзя.", () => { fetch('/action/delete_scan', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: parseInt(id)}) }); }); }
+    
+    function confirmShutdown() {
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('shutdownModal')).hide();
+        const div = document.createElement('div');
+        div.className = 'shutdown-screen';
+        div.innerHTML = `<i class="bi bi-exclamation-triangle-fill warning-tri"></i><h1 class="mt-4 fw-bold text-white text-uppercase" style="letter-spacing: 4px;">MES ВЫКЛЮЧАЕТСЯ</h1><div class="progress mt-4" style="width: 300px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;"><div class="progress-bar bg-danger" style="width: 0%; transition: width 3s linear;"></div></div>`;
+        document.body.appendChild(div);
+        setTimeout(() => div.querySelector('.progress-bar').style.width = '100%', 50);
+        setTimeout(async () => { try { await fetch('/action/shutdown', { method: 'POST' }); } catch(e) {} window.close(); div.innerHTML = `<h1 class="text-danger fw-bold" style="font-size:3rem">СЕРВЕР ОСТАНОВЛЕН</h1>`; }, 3000);
+    }
+
+    function downloadExcel() { const dFrom = document.getElementById('export-date-from').value; const dTo = document.getElementById('export-date-to').value; const category = document.querySelector('input[name="btnExportType"]:checked').value; window.location.href = `/export?date_from=${dFrom}&date_to=${dTo}&category=${category}`; }
+    
+    function switchMobileTab(tabName) { if (window.innerWidth > 768) return; document.querySelectorAll('.nav-item-mobile').forEach(btn => btn.classList.remove('active')); const icons = { 'home': 'bi-upc-scan', 'orders': 'bi-list-task', 'history': 'bi-clock-history' }; document.querySelectorAll('.nav-item-mobile').forEach(btn => { if(btn.querySelector(`.${icons[tabName]}`)) btn.classList.add('active'); }); if (tabName === 'orders') { const sb = document.getElementById('sidebar'); if (!sb.classList.contains('active')) toggleSidebar(); return; } document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); document.querySelectorAll('.mobile-view-section').forEach(el => el.classList.remove('active')); if (tabName === 'home') { document.getElementById('mob-home').classList.add('active'); setTimeout(() => document.getElementById('serial-input').focus(), 100); } else if (tabName === 'history') { document.getElementById('mob-history').classList.add('active'); } }
+</script>
+</body>
+</html>
