@@ -50,7 +50,7 @@
 
 ```bash
 # 1. Скачать проект
-git clone https://github.com/ВАШ_НИКНЕЙМ/MESlight_factory.git
+git clone git@github.com:mioamio/MESlight_factory.git
 
 # 2. Перейти в папку
 cd MESlight_factory
