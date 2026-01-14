@@ -190,14 +190,23 @@ func initDB() {
 func refreshGlobalStats() {
 	todayStart := time.Now().Format("2006-01-02") + " 00:00:00"
 	todayEnd := time.Now().Format("2006-01-02") + " 23:59:59"
+
+	// 1. Считаем реальные сканирования за сегодня
 	row := db.QueryRow(`SELECT COUNT(id), SUM(CASE WHEN type='conveyor_1' THEN 1 ELSE 0 END), SUM(CASE WHEN type='conveyor_2' THEN 1 ELSE 0 END), SUM(CASE WHEN type='stapel' THEN 1 ELSE 0 END) FROM scans WHERE timestamp >= ? AND timestamp <= ?`, todayStart, todayEnd)
 	var t, c1, c2, st sql.NullInt64
 	row.Scan(&t, &c1, &c2, &st)
+
+	// 2. Добавляем ручные правки (manual_offset) от АКТИВНЫХ заказов
+	// Это гарантирует, что если вы поправили цифру руками, она добавится в общий итог
+	row2 := db.QueryRow(`SELECT SUM(manual_offset), SUM(CASE WHEN type='conveyor_1' THEN manual_offset ELSE 0 END), SUM(CASE WHEN type='conveyor_2' THEN manual_offset ELSE 0 END), SUM(CASE WHEN type='stapel' THEN manual_offset ELSE 0 END) FROM orders WHERE status = 'active'`)
+	var mt, mc1, mc2, mst sql.NullInt64
+	row2.Scan(&mt, &mc1, &mc2, &mst)
+
 	statsMu.Lock()
-	globalStats.Total = int(t.Int64)
-	globalStats.C1 = int(c1.Int64)
-	globalStats.C2 = int(c2.Int64)
-	globalStats.Stapel = int(st.Int64)
+	globalStats.Total = int(t.Int64 + mt.Int64)
+	globalStats.C1 = int(c1.Int64 + mc1.Int64)
+	globalStats.C2 = int(c2.Int64 + mc2.Int64)
+	globalStats.Stapel = int(st.Int64 + mst.Int64)
 	statsMu.Unlock()
 }
 
@@ -243,11 +252,12 @@ func getSettings() Settings {
 	for rows.Next() {
 		var k, v string
 		rows.Scan(&k, &v)
-		if k == "shift_start" {
+		switch k {
+		case "shift_start":
 			s.ShiftStart = v
-		} else if k == "shift_end" {
+		case "shift_end":
 			s.ShiftEnd = v
-		} else if k == "breaks" {
+		case "breaks":
 			json.Unmarshal([]byte(v), &s.Breaks)
 		}
 	}
@@ -328,38 +338,59 @@ func main() {
 		}
 	}))
 
-	// API Handlers...
 	app.Post("/action/add_order", func(c *fiber.Ctx) error {
 		type Req struct {
-			Name      string `json:"name"`
-			Type      string `json:"type"`
-			Target    string `json:"target"`
-			AllowDups bool   `json:"allow_dups"`
+			Name      string      `json:"name"`
+			Type      string      `json:"type"`
+			Target    interface{} `json:"target"` // interface чтобы принять строку или число
+			AllowDups bool        `json:"allow_dups"`
 		}
 		var r Req
 		if err := c.BodyParser(&r); err != nil {
 			return c.SendStatus(400)
 		}
+
+		// Конвертация target в int
+		target := 0
+		switch v := r.Target.(type) {
+		case float64:
+			target = int(v)
+		case string:
+			target, _ = strconv.Atoi(v)
+		}
+
 		allow := 0
 		if r.AllowDups {
 			allow = 1
 		}
-		_, err := db.Exec("INSERT INTO orders (name, type, target_qty, allow_dups, created_at) VALUES (?, ?, ?, ?, ?)", strings.ToUpper(strings.TrimSpace(r.Name)), r.Type, r.Target, allow, time.Now().Format("2006-01-02 15:04:05"))
+
+		// ИЗМЕНЕНИЕ: Получаем ID созданной записи
+		res, err := db.Exec("INSERT INTO orders (name, type, target_qty, allow_dups, created_at) VALUES (?, ?, ?, ?, ?)", strings.ToUpper(strings.TrimSpace(r.Name)), r.Type, target, allow, time.Now().Format("2006-01-02 15:04:05"))
+
+		var newID int64 = 0
 		if err == nil {
+			newID, _ = res.LastInsertId()
 			broadcastUpdate()
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+
+		// Возвращаем ID клиенту
+		return c.JSON(fiber.Map{"status": "ok", "id": newID})
 	})
 
 	app.Post("/action/edit_order", func(c *fiber.Ctx) error {
 		type Req struct {
-			ID      interface{} `json:"id"`
-			Name    string      `json:"name"`
-			Target  interface{} `json:"target"`
-			Scanned interface{} `json:"scanned_count"`
+			ID        interface{} `json:"id"`
+			Name      string      `json:"name"`
+			Target    interface{} `json:"target"`
+			Scanned   interface{} `json:"scanned_count"`
+			AllowDups bool        `json:"allow_dups"`
 		}
 		var r Req
-		c.BodyParser(&r)
+		if err := c.BodyParser(&r); err != nil {
+			return c.SendStatus(400)
+		}
+
+		// Вспомогательная функция для приведения типов
 		toInt := func(v interface{}) int {
 			switch val := v.(type) {
 			case float64:
@@ -371,17 +402,34 @@ func main() {
 				return 0
 			}
 		}
+
 		id := toInt(r.ID)
 		target := toInt(r.Target)
-		db.Exec("UPDATE orders SET name=?, target_qty=? WHERE id=?", strings.ToUpper(r.Name), target, id)
+
+		// Конвертируем галочку в число (0 или 1) для базы
+		dups := 0
+		if r.AllowDups {
+			dups = 1
+		}
+
+		// Обновляем данные заказа (Имя, План, Дубликаты)
+		db.Exec("UPDATE orders SET name=?, target_qty=?, allow_dups=? WHERE id=?", strings.ToUpper(r.Name), target, dups, id)
+
+		// Если передали новое количество факта (коррекция)
 		if r.Scanned != nil {
 			newTotal := toInt(r.Scanned)
 			var phys int
+			// Узнаем сколько было реально насканировано
 			if err := db.QueryRow("SELECT scanned_qty FROM orders WHERE id=?", id).Scan(&phys); err == nil {
+				// Разницу записываем в manual_offset
 				db.Exec("UPDATE orders SET manual_offset=? WHERE id=?", newTotal-phys, id)
 			}
 		}
+
+		// Пересчитываем статистику
+		refreshGlobalStats()
 		broadcastUpdate()
+
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
@@ -399,20 +447,25 @@ func main() {
 
 	app.Post("/action/scan", func(c *fiber.Ctx) error {
 		type Req struct {
-			Serial  string `json:"serial"`
-			OrderID int    `json:"order_id"`
+			Serial    string `json:"serial"`
+			OrderID   int    `json:"order_id"`
+			Timestamp string `json:"timestamp"` // Добавили поле
 		}
 		var r Req
+		// Если JSON кривой или данных нет
 		if err := c.BodyParser(&r); err != nil || r.Serial == "" || r.OrderID == 0 {
 			return c.JSON(fiber.Map{"status": "error", "msg": "Ошибка данных"})
 		}
 
 		var oType, name string
-		var allowDups, target, manual, scanned int
-		if err := db.QueryRow("SELECT type, allow_dups, target_qty, manual_offset, name, scanned_qty FROM orders WHERE id=?", r.OrderID).Scan(&oType, &allowDups, &target, &manual, &name, &scanned); err != nil {
+		var allowDups, target, manual int
+
+		// 1. Узнаем Имя заказа по ID
+		if err := db.QueryRow("SELECT type, allow_dups, target_qty, manual_offset, name FROM orders WHERE id=?", r.OrderID).Scan(&oType, &allowDups, &target, &manual, &name); err != nil {
 			return c.JSON(fiber.Map{"status": "error", "msg": "Заказ закрыт"})
 		}
 
+		// Проверка дубликатов (если дубли запрещены)
 		if allowDups == 0 {
 			var exists int
 			db.QueryRow("SELECT 1 FROM scans WHERE order_id=? AND serial=? LIMIT 1", r.OrderID, r.Serial).Scan(&exists)
@@ -421,7 +474,12 @@ func main() {
 			}
 		}
 
-		ts := time.Now().Format("2006-01-02 15:04:05")
+		// ВРЕМЯ: Если клиент прислал timestamp (оффлайн скан), используем его. Иначе берем текущее.
+		ts := r.Timestamp
+		if ts == "" {
+			ts = time.Now().Format("2006-01-02 15:04:05")
+		}
+
 		res, err := db.Exec("INSERT INTO scans (serial, order_id, type, timestamp) VALUES (?, ?, ?, ?)", r.Serial, r.OrderID, oType, ts)
 		if err != nil {
 			log.Println("SQL Error:", err)
@@ -429,27 +487,39 @@ func main() {
 		}
 
 		sid, _ := res.LastInsertId()
+
+		// Обновляем конкретный заказ
 		db.Exec("UPDATE orders SET scanned_qty = scanned_qty + 1 WHERE id=?", r.OrderID)
-		newTotal := scanned + 1 + manual
-		if target > 0 && newTotal >= target {
-			db.Exec("UPDATE orders SET completed_at = ? WHERE id = ? AND completed_at IS NULL", ts, r.OrderID)
-		}
+
+		var sharedTotal int
+		db.QueryRow("SELECT SUM(scanned_qty + manual_offset) FROM orders WHERE name = ? AND status = 'active'", name).Scan(&sharedTotal)
 
 		entry := ScanEntry{ID: int(sid), Serial: r.Serial, Type: oType, Timestamp: ts, OrderName: name, OrderID: r.OrderID}
+
 		statsMu.Lock()
 		globalStats.Total++
-		if oType == "conveyor_1" {
+		switch oType {
+		case "conveyor_1":
 			globalStats.C1++
-		} else if oType == "conveyor_2" {
+		case "conveyor_2":
 			globalStats.C2++
-		} else if oType == "stapel" {
+		case "stapel":
 			globalStats.Stapel++
 		}
 		currentStatsSnapshot := globalStats
 		statsMu.Unlock()
 
 		go func() {
-			msg := fiber.Map{"type": "scan_event", "data": fiber.Map{"order_id": r.OrderID, "order_total": newTotal, "scan_entry": entry, "stats": currentStatsSnapshot}}
+			msg := fiber.Map{
+				"type": "scan_event",
+				"data": fiber.Map{
+					"order_id":    r.OrderID,
+					"order_name":  name,
+					"order_total": sharedTotal,
+					"scan_entry":  entry,
+					"stats":       currentStatsSnapshot,
+				},
+			}
 			jsonBytes, _ := json.Marshal(msg)
 			hub.broadcast <- jsonBytes
 		}()
@@ -461,15 +531,28 @@ func main() {
 			ID int `json:"id"`
 		}
 		var r Req
-		c.BodyParser(&r)
-		var oid int
-		db.QueryRow("SELECT order_id FROM scans WHERE id=?", r.ID).Scan(&oid)
-		if oid > 0 {
-			db.Exec("DELETE FROM scans WHERE id=?", r.ID)
-			db.Exec("UPDATE orders SET scanned_qty = MAX(0, scanned_qty - 1) WHERE id=?", oid)
-			go func() { refreshGlobalStats(); broadcastUpdate() }()
+		if err := c.BodyParser(&r); err != nil {
+			return c.JSON(fiber.Map{"status": "error", "msg": "Bad request"})
 		}
-		return c.JSON(fiber.Map{"status": "ok"})
+
+		// Сначала узнаем ID заказа
+		var oid int
+		err := db.QueryRow("SELECT order_id FROM scans WHERE id=?", r.ID).Scan(&oid)
+
+		if err == nil && oid > 0 {
+			// Удаляем скан
+			db.Exec("DELETE FROM scans WHERE id=?", r.ID)
+			// Уменьшаем счетчик заказа (не даем уйти ниже нуля)
+			db.Exec("UPDATE orders SET scanned_qty = MAX(0, scanned_qty - 1) WHERE id=?", oid)
+
+			// Обновляем статистику для всех
+			go func() {
+				refreshGlobalStats()
+				broadcastUpdate()
+			}()
+			return c.JSON(fiber.Map{"status": "ok"})
+		}
+		return c.JSON(fiber.Map{"status": "error", "msg": "Scan not found"})
 	})
 
 	app.Get("/action/get_settings", func(c *fiber.Ctx) error { return c.JSON(getSettings()) })
@@ -641,10 +724,39 @@ func main() {
 		})
 	})
 
+	// НОВОЕ API: Получение истории конкретного заказа
+	app.Get("/api/order_history", func(c *fiber.Ctx) error {
+		oid := c.Query("id")
+		if oid == "" {
+			return c.JSON([]ScanEntry{})
+		}
+
+		// Берем последние 1000 записей по этому заказу
+		rows, _ := db.Query(`SELECT s.id, s.serial, s.type, s.timestamp, o.name, o.id FROM scans s LEFT JOIN orders o ON s.order_id = o.id WHERE s.order_id = ? ORDER BY s.id DESC LIMIT 1000`, oid)
+		defer rows.Close()
+
+		var history []ScanEntry
+		for rows.Next() {
+			var s ScanEntry
+			var oid sql.NullInt64
+			var oname sql.NullString
+			rows.Scan(&s.ID, &s.Serial, &s.Type, &s.Timestamp, &oname, &oid)
+			s.OrderID = int(oid.Int64)
+			s.OrderName = oname.String
+			history = append(history, s)
+		}
+		// Если записей нет, возвращаем пустой массив, а не null
+		if history == nil {
+			history = []ScanEntry{}
+		}
+		return c.JSON(history)
+	})
+
 	app.Get("/export", func(c *fiber.Ctx) error {
 		dFrom := c.Query("date_from")
 		dTo := c.Query("date_to")
 		cat := c.Query("category")
+
 		filter := ""
 		filePrefix := "All"
 		switch cat {
@@ -655,53 +767,75 @@ func main() {
 			filter = "AND s.type IN ('conveyor_1', 'conveyor_2')"
 			filePrefix = "Linii"
 		}
+
 		dateStr := time.Now().Format("02.01.2006")
 		fileName := fmt.Sprintf("%s_%s.xlsx", filePrefix, dateStr)
+
+		// 1. Детальный список сканирований
 		q := fmt.Sprintf(`SELECT o.name, s.serial, s.timestamp, s.type FROM scans s LEFT JOIN orders o ON s.order_id=o.id WHERE s.timestamp >= '%s 00:00:00' AND s.timestamp <= '%s 23:59:59' %s ORDER BY s.timestamp DESC`, dFrom, dTo, filter)
 		rows, _ := db.Query(q)
 		defer rows.Close()
+
 		f := excelize.NewFile()
 		s := "Sheet1"
 		idx := 2
+
+		// Стили
 		styleHeader, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Color: "#FFFFFF"}, Fill: excelize.Fill{Type: "pattern", Color: []string{"#3b82f6"}, Pattern: 1}, Alignment: &excelize.Alignment{Horizontal: "center"}})
 		styleBorder, _ := f.NewStyle(&excelize.Style{Border: []excelize.Border{{Type: "left", Color: "000000", Style: 1}, {Type: "top", Color: "000000", Style: 1}, {Type: "bottom", Color: "000000", Style: 1}, {Type: "right", Color: "000000", Style: 1}}})
 		styleSummaryHeader, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, Fill: excelize.Fill{Type: "pattern", Color: []string{"#e2e8f0"}, Pattern: 1}, Border: []excelize.Border{{Type: "bottom", Color: "000000", Style: 2}}})
+		styleGrandTotal, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 12}, Fill: excelize.Fill{Type: "pattern", Color: []string{"#cbd5e1"}, Pattern: 1}, Border: []excelize.Border{{Type: "top", Color: "000000", Style: 2}, {Type: "bottom", Color: "000000", Style: 2}}})
+
+		// Заголовки листа 1
 		headersRaw := []string{"Заказ", "SN", "Время", "Участок"}
 		for i, h := range headersRaw {
 			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 			f.SetCellValue(s, cell, h)
 			f.SetCellStyle(s, cell, cell, styleHeader)
 		}
+
 		summary := make(map[string]map[string]int)
+
 		for rows.Next() {
 			var n, sn, ts, t string
 			rows.Scan(&n, &sn, &ts, &t)
+
+			// Заполняем сырые данные
 			f.SetCellValue(s, fmt.Sprintf("A%d", idx), n)
 			f.SetCellValue(s, fmt.Sprintf("B%d", idx), sn)
 			f.SetCellValue(s, fmt.Sprintf("C%d", idx), ts)
+
 			lineName := "Неизв."
-			if t == "conveyor_1" {
+			switch t {
+			case "conveyor_1":
 				lineName = "Линия 1"
-			} else if t == "conveyor_2" {
+			case "conveyor_2":
 				lineName = "Линия 2"
-			} else if t == "stapel" {
+			case "stapel":
 				lineName = "Стапель"
 			}
 			f.SetCellValue(s, fmt.Sprintf("D%d", idx), lineName)
+
+			// Собираем статистику для сводной таблицы
 			if summary[n] == nil {
 				summary[n] = make(map[string]int)
 			}
 			summary[n][lineName]++
 			idx++
 		}
+
+		// Ширина колонок
 		f.SetColWidth(s, "A", "A", 25)
 		f.SetColWidth(s, "B", "B", 30)
 		f.SetColWidth(s, "C", "C", 20)
 		f.SetColWidth(s, "D", "D", 15)
+
+		// --- СВОДНАЯ ТАБЛИЦА ---
 		sumRow := idx + 3
 		f.SetCellValue(s, fmt.Sprintf("A%d", sumRow), "СВОДНЫЙ ОТЧЕТ")
 		f.SetCellStyle(s, fmt.Sprintf("A%d", sumRow), fmt.Sprintf("A%d", sumRow), styleSummaryHeader)
 		sumRow++
+
 		headersSum := []string{"Наименование заказа", "Линия 1", "Линия 2", "Стапель", "ИТОГО"}
 		for i, h := range headersSum {
 			cell, _ := excelize.CoordinatesToCellName(i+1, sumRow)
@@ -709,12 +843,39 @@ func main() {
 			f.SetCellStyle(s, cell, cell, styleHeader)
 		}
 		sumRow++
+
+		// Сортируем заказы по алфавиту для красоты
+		var orderNames []string
+		for k := range summary {
+			orderNames = append(orderNames, k)
+		}
+		// Простая пузырьковая сортировка (или можно sort.Strings если импортировать "sort")
+		for i := 0; i < len(orderNames)-1; i++ {
+			for j := 0; j < len(orderNames)-i-1; j++ {
+				if orderNames[j] > orderNames[j+1] {
+					orderNames[j], orderNames[j+1] = orderNames[j+1], orderNames[j]
+				}
+			}
+		}
+
 		startSumData := sumRow
-		for orderName, lines := range summary {
+
+		// Переменные для ОБЩЕГО ИТОГА
+		var grandL1, grandL2, grandSt, grandAll int
+
+		for _, orderName := range orderNames {
+			lines := summary[orderName]
 			l1 := lines["Линия 1"]
 			l2 := lines["Линия 2"]
 			st := lines["Стапель"]
 			total := l1 + l2 + st
+
+			// Суммируем в общий итог
+			grandL1 += l1
+			grandL2 += l2
+			grandSt += st
+			grandAll += total
+
 			f.SetCellValue(s, fmt.Sprintf("A%d", sumRow), orderName)
 			f.SetCellValue(s, fmt.Sprintf("B%d", sumRow), l1)
 			f.SetCellValue(s, fmt.Sprintf("C%d", sumRow), l2)
@@ -722,9 +883,22 @@ func main() {
 			f.SetCellValue(s, fmt.Sprintf("E%d", sumRow), total)
 			sumRow++
 		}
+
+		// Рисуем границы для таблицы данных
 		if sumRow > startSumData {
 			f.SetCellStyle(s, fmt.Sprintf("A%d", startSumData), fmt.Sprintf("E%d", sumRow-1), styleBorder)
 		}
+
+		// --- ВЫВОД СТРОКИ ОБЩЕГО ИТОГА ---
+		f.SetCellValue(s, fmt.Sprintf("A%d", sumRow), "ОБЩИЙ ИТОГ")
+		f.SetCellValue(s, fmt.Sprintf("B%d", sumRow), grandL1)
+		f.SetCellValue(s, fmt.Sprintf("C%d", sumRow), grandL2)
+		f.SetCellValue(s, fmt.Sprintf("D%d", sumRow), grandSt)
+		f.SetCellValue(s, fmt.Sprintf("E%d", sumRow), grandAll)
+
+		// Стилизуем строку итога (жирный шрифт, фон)
+		f.SetCellStyle(s, fmt.Sprintf("A%d", sumRow), fmt.Sprintf("E%d", sumRow), styleGrandTotal)
+
 		c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", fileName))
 		return f.Write(c)
