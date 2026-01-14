@@ -4,12 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
 
     <title>СКТ-ПРО</title>
-    
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9708/9708956.png">
+    <link rel="manifest" id="my-manifest-placeholder">
+    <script>
+    const manifest = {
+        "name": "СКТ-ПРО",
+        "short_name": "СКТ-ПРО",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#0f172a",
+        "icons": [{
+            "src": "https://cdn-icons-png.flaticon.com/512/9708/9708956.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }]
+    };
+    const stringManifest = JSON.stringify(manifest);
+    const blob = new Blob([stringManifest], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blob);
+    document.querySelector('#my-manifest-placeholder').setAttribute('href', manifestURL);
+</script>
     <meta name="theme-color" content="#0f172a">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%233b82f6'/%3E%3Ctext x='50' y='70' font-family='Arial, sans-serif' font-weight='900' font-size='50' fill='white' text-anchor='middle'%3EСКТ%3C/text%3E%3C/svg%3E">
     
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -20,131 +40,352 @@
 
     <style>
         :root {
+            /* БАЗОВЫЙ ШРИФТ */
+            --fs-base: 1rem;
+            
+            /* НОВАЯ ПЕРЕМЕННАЯ ДЛЯ ЗАГОЛОВКОВ */
+            --fs-label: 0.85rem; 
+
             --sidebar-bg: #0f172a; --sidebar-text: #94a3b8; --bg-main: #6caceb;
             --surface: #ffffff; --accent: #3b82f6; --success: #10b981;
             --danger: #ef4444; --warning: #f59e0b; --card-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
             --c-blue: #2563eb; --c-purple: #7c3aed; --c-green: #16a34a;
             
-            --fs-stat: 7rem; --fs-sidebar: 1rem; --fs-table: 1.5rem;
-            --fs-nav-icon: 1.6rem; --fs-header: 1rem; --fs-card-title: 1rem; --fs-card-meta: 0.85rem;
+            /* Переменные шрифтов */
+            --fs-stat: 7rem; 
+            --fs-sidebar: 1rem; 
+            --fs-table: 1.5rem; 
+            --fs-nav-icon: 1.6rem; 
+            --fs-header: 1rem; 
+            --fs-card-title: 1rem; 
+            --fs-card-meta: 0.85rem;
             
-            /* Безопасная зона для iPhone (челка и нижняя полоска) */
-            --safe-top: env(safe-area-inset-top, 20px);
-            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --nav-height: 80px; /* MD3 Height */
         }
 
-        * { scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, 0.5) transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background-color: rgba(148, 163, 184, 0.3); border-radius: 20px; }
-        
+        /* ПРИМЕНЯЕМ НОВЫЙ РАЗМЕР ШРИФТА К НУЖНЫМ ЭЛЕМЕНТАМ */
+        .stat-label, 
+        .stat-label-main,
+        .group-summary, 
+        #scan-status,
+        .fw-bold.text-uppercase.small, /* Для заголовков "ПРОИЗВЕДЕНО" и т.д. */
+        .history-header {
+            font-size: var(--fs-label) !important;
+        }
+
+        /* RESET & BASE */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        * { scrollbar-width: none; -ms-overflow-style: none; touch-action: manipulation; }
+        .modal-open .modal { overflow-x: hidden; overflow-y: auto; }
+        .modal-body { -webkit-overflow-scrolling: touch; } 
+
         body { 
             font-family: 'Manrope', sans-serif; height: 100vh; height: 100dvh;
             overflow: hidden; display: flex; background-color: var(--bg-main); 
             -webkit-user-select: none; user-select: none; cursor: default;
-            overscroll-behavior: none; 
+            overscroll-behavior-y: auto !important;
+            font-size: var(--fs-base); /* Применяем базовый шрифт */
         }
+        
+        /* Масштабируем элементы форм вместе с базовым шрифтом */
+        .modern-input, .btn, .form-control, .form-select { font-size: var(--fs-base) !important; }
+        #ptr { display: none !important; }
         input { -webkit-user-select: text !important; user-select: text !important; cursor: text !important; }
-
         body.bg-error-persistent { background-color: #ef4444 !important; }
-        body.bg-error-persistent .sidebar { border-right-color: #fca5a5; }
-        body.bg-error-persistent .stat-val-big { color: white !important; }
-        body.bg-error-persistent .stat-label-main { color: rgba(255,255,255,0.8) !important; }
 
-        /* SIDEBAR DESKTOP */
-        .sidebar { background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; z-index: 1050; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease; width: 300px; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.05); }
-        .sidebar-inner { width: 300px; height: 100%; display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
-        .sidebar.collapsed { width: 0; padding: 0; border: none; }
-        .sidebar-header-group { flex-shrink: 0; display: flex; flex-direction: column; }
+        .main-layout { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: relative; z-index: 1; }
         
-        .btn-create { background: var(--accent); color: white; border: none; padding: 12px; font-size: 1rem; border-radius: 12px; font-weight: 700; width: 100%; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; transition: 0.2s; }
-        .btn-create:hover { background: #2563eb; transform: translateY(-2px); }
+        .overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); 
+            z-index: 50; opacity: 0; transition: opacity 0.3s; 
+        }
+        .overlay.active { display: block; opacity: 1; }
+
+        .sidebar { 
+            background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; flex-shrink: 0; 
+            z-index: 60;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: 300px; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.05); 
+        }
+
+        /* Базовый стиль bottom-nav (для десктопа скрыт, настройки ниже в media query) */
+        .bottom-nav { 
+            display: none; 
+            z-index: 70;
+        }
+
+        .modal-backdrop { z-index: 1050 !important; }
+        .modal { z-index: 1060 !important; }
+
+        /* === COMPONENTS === */
+        .sidebar-inner { width: 300px; height: 100%; display: flex; flex-direction: column; padding: 15px; overflow: hidden; font-size: var(--fs-sidebar); } 
         
-        .btn-all-scans { background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); padding: 10px; font-size: 0.9rem; border-radius: 12px; font-weight: 600; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; white-space: nowrap; }
-        .btn-all-scans.active { background: rgba(255,255,255,0.2); color: white; border-color: white; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
-        
-        .sidebar-search { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: white; border-radius: 8px; padding: 10px 12px; width: 100%; font-size: 0.9rem; margin-bottom: 10px; outline: none; }
+        .btn-all-scans { background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); padding: 10px; font-size: 0.9em; border-radius: 12px; font-weight: 600; width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+        .btn-all-scans.active { background: rgba(255,255,255,0.2); color: white; border-color: white; }
+        .sidebar-search { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: white; border-radius: 8px; padding: 10px 12px; width: 100%; font-size: 0.9em; margin-bottom: 10px; outline: none; }
         .sidebar-search:focus { border-color: var(--accent); background: rgba(0,0,0,0.5); }
-        
-        .orders-wrapper { flex: 1; overflow-y: auto; min-height: 0; padding-right: 4px; padding-bottom: 80px; -webkit-overflow-scrolling: touch; }
+        .orders-wrapper { flex: 1; overflow-y: auto; min-height: 0; padding-right: 4px; padding-bottom: 20px; }
         .group-header { margin-bottom: 5px; }
-        .group-summary { cursor: pointer; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; padding: 10px 5px; display: flex; justify-content: space-between; align-items: center; }
-        .group-summary:hover { color: white; }
+        .group-summary { cursor: pointer; font-size: 0.85em; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; padding: 10px 5px; display: flex; justify-content: space-between; align-items: center; }
         .group-header.open .group-content { display: block; animation: fadeIn 0.3s; }
         .group-content { display: none; }
         .group-summary.today { color: var(--success); }
         .group-summary.inwork { color: #f59e0b; }
 
-        .order-card { background: rgba(255,255,255,0.05); border: 2px solid transparent; padding: 12px 15px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; will-change: transform, box-shadow; }
-        .order-card:hover { transform: translateY(-1px); }
+        /* ОБЫЧНЫЕ КАРТОЧКИ (Базовый стиль) */
+        .order-card { background: rgba(255,255,255,0.05); border: 2px solid transparent; padding: 12px 15px; border-radius: 12px; margin-bottom: 8px; cursor: pointer; position: relative; overflow: hidden; transition: transform 0.1s; z-index: 1; }
+        .order-card:active { transform: scale(0.98); background: rgba(255,255,255,0.08); }
         .order-card.status-work { background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.4)); border-color: rgba(249, 115, 22, 0.3); }
         .order-card.status-done { background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(21, 128, 61, 0.4)); border-color: rgba(34, 197, 94, 0.3); }
         .order-card.active { border-color: #ffffff !important; box-shadow: 0 0 15px rgba(255, 255, 255, 0.25); z-index: 5; }
-        .order-progress-bg { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.15)); z-index: 0; transition: width 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); pointer-events: none; }
-        .order-card.active .order-progress-bg { background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.25)); }
-        .order-content-wrap { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 4px; }
-        .order-top-row { display: flex; justify-content: space-between; align-items: flex-start; }
-        .order-title { font-weight: 800; font-size: var(--fs-card-title); color: white; line-height: 1.2; word-break: break-all; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-        .order-meta { font-size: var(--fs-card-meta); color: rgba(255,255,255,0.8); font-family: 'JetBrains Mono', monospace; display: flex; justify-content: space-between; margin-top: 2px; }
+        .order-progress-bg { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.15)); z-index: 0; transition: width 0.4s; pointer-events: none; }
+        
+        .order-content-wrap { 
+                flex-direction: column; 
+                align-items: flex-start; 
+                justify-content: center; 
+                width: 100%; 
+                gap: 2px; 
+                padding-right: 45px; /* Место под кнопки справа */
+                position: relative;
+                z-index: 5; /* Текст должен быть выше водяного знака */
+            }
+        .order-title { font-weight: 800; font-size: var(--fs-card-title); color: white; line-height: 1.2; word-break: break-all; }
+        .order-meta { font-size: var(--fs-card-meta); color: rgba(255,255,255,0.8); font-family: 'JetBrains Mono', monospace; display: flex; justify-content: space-between; }
         .order-card.active .order-meta { color: #ffffff; font-weight: 700; }
-        .watermark-loc { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 900; color: rgba(255,255,255,0.1); z-index: 1; pointer-events: none; line-height: 1; font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
-        .order-card.active .watermark-loc { color: rgba(255,255,255,0.25); }
+        .watermark-loc { 
+                /* ПРИНУДИТЕЛЬНОЕ ЦЕНТРИРОВАНИЕ */
+                position: absolute !important;
+                top: 50% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                right: auto !important; /* Сбрасываем позицию справа */
+                
+                /* ВИЗУАЛЬНЫЙ СТИЛЬ */
+                font-size: 3.5rem !important; /* Крупный размер */
+                font-weight: 900 !important;
+                color: #ffffff !important;
+                opacity: 0.2 !important; /* Прозрачность 20% (полупрозрачный) */
+                
+                /* СБРОС ЛИШНЕГО */
+                background: transparent !important;
+                padding: 0 !important;
+                border: none !important;
+                border-radius: 0 !important;
+                
+                /* СЛОИ */
+                z-index: 1 !important; /* Ниже текста */
+                pointer-events: none;
+                white-space: nowrap;
+            }
         .order-controls { position: absolute; top: 50%; transform: translateY(-50%); right: 8px; display: none; gap: 6px; z-index: 10; }
         .order-card:hover .order-controls, .order-card.active .order-controls { display: flex; }
-        .btn-mini { width: 34px; height: 34px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.25); color: #ffffff; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .btn-mini:hover { background: white; color: var(--accent); }
-        .btn-mini.del:hover { background: #fee2e2; color: #ef4444; }
-
+        .btn-mini { width: 34px; height: 34px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.25); color: #ffffff; }
+        
         .sidebar-footer { margin-top: auto; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
-        .btn-tool { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; width: 100%; padding: 12px; border-radius: 10px; font-weight: 600; font-size: 0.9rem; margin-top: 8px; text-align: left; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .btn-tool { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #cbd5e1; width: 100%; padding: 12px; border-radius: 10px; font-weight: 600; font-size: 0.9em; margin-top: 8px; text-align: left; display: flex; align-items: center; gap: 10px; transition: 0.2s; }
         .btn-tool:hover { background: rgba(255,255,255,0.05); color: white; border-color: white; }
 
-        /* MAIN LAYOUT DESKTOP */
-        .main-layout { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; position: relative; z-index: 1; }
         .top-bar { height: 70px; background: var(--surface); border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; font-size: var(--fs-header); }
         .mode-btn { background: #f1f5f9; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 1rem; color: #475569; display: flex; align-items: center; gap: 8px; }
         body.mode-itr .mode-btn { background: #0f172a; color: white; }
         
         .dashboard-content { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 25px; }
         .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; }
-        
         .stat-card { background: var(--surface); border-radius: 20px; padding: 20px; box-shadow: var(--card-shadow); border: 1px solid white; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; height: 100%; }
         .stat-val-sub { font-size: 2.5em; font-weight: 800; line-height: 1; }
         .stat-label { text-transform: uppercase; font-size: 1.2rem; font-weight: 800; letter-spacing: 1.5px; color: #64748b; margin-top: 10px; }
         
         .work-section { display: flex; gap: 25px; flex: 1; min-height: 0; }
-        .left-column { flex: 1; display: flex; flex-direction: column; gap: 25px; min-width: 0; }
         
-        .stat-card.main { background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); border: 1px solid #e2e8f0; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; position: relative; overflow: hidden; }
+        /* ИСПРАВЛЕНО: Узкая левая колонка + RESIZER */
+        .left-column { flex: 0.8; display: flex; flex-direction: column; gap: 25px; min-width: 0; overflow: hidden; }
+        
+        /* МАСТЕР СОЗДАНИЯ ЗАКАЗА */
+        .wizard-container {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .wizard-input {
+            background: rgba(59, 130, 246, 0.15); 
+            border: 1px solid var(--accent); 
+            color: #fff; 
+            font-weight: 700;
+            border-radius: 8px;
+            padding: 10px 12px;
+            width: 100%;
+            outline: none;
+            transition: 0.3s;
+        }
+        
+        .wizard-input.step-qty {
+            border-color: var(--warning);
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+
+        .wizard-settings {
+            display: none; 
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            outline: none;
+        }
+        
+        .wiz-types { display: flex; justify-content: space-between; gap: 5px; margin-bottom: 12px; }
+        
+        .wiz-type { 
+            flex: 1; 
+            padding: 10px 5px; 
+            border-radius: 8px; 
+            font-size: 1.1rem; 
+            font-weight: 800; 
+            color: #94a3b8; 
+            background: rgba(255,255,255,0.05); 
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+        .wiz-type.active { 
+            color: white; 
+            background: var(--accent); 
+            border-color: white;
+            box-shadow: 0 4px 15px rgba(59,130,246,0.4); 
+            transform: scale(1.05);
+        }
+        
+        .wiz-dups { 
+            font-size: 1rem; 
+            font-weight: 700; 
+            color: #cbd5e1; 
+            padding: 8px; 
+            border-radius: 8px; 
+            background: rgba(0,0,0,0.2);
+            margin-bottom: 8px;
+        }
+        .wiz-dups.active { color: #f87171; background: rgba(239,68,68,0.15); border: 1px solid #ef4444; }
+        
+        .wiz-hint { font-size: 0.8rem; color: rgba(255,255,255,0.5); margin-top: 5px; }
+        .wiz-hint i { font-size: 1rem; margin: 0 5px; }
+
+        .stat-card.main { 
+            background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%); 
+            border: 1px solid #e2e8f0; 
+            flex: 2.5; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; position: relative; overflow: hidden; 
+            border-radius: 20px; box-shadow: var(--card-shadow);
+        }
         .stat-val-big { font-weight: 800; line-height: 0.9; color: #0f172a; letter-spacing: -3px; font-size: var(--fs-stat); transition: color 0.3s; }
         .stat-label-main { text-transform: uppercase; font-size: 1.2rem; font-weight: 800; letter-spacing: 1.5px; color: #64748b; margin-top: 15px; display: block; }
         
-        .scanner-panel { background: var(--surface); border-radius: 20px; box-shadow: var(--card-shadow); padding: 25px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .history-panel { 
+            flex: 1.5; 
+            background: #ffffff; 
+            border-radius: 24px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.04); 
+            border: 1px solid rgba(0,0,0,0.02); 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden;
+            min-height: 200px; 
+            flex-shrink: 0;
+        }
+        .scanner-panel { flex: 0 0 auto; background: var(--surface); border-radius: 20px; box-shadow: var(--card-shadow); padding: 25px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        
         .scan-input { width: 100%; font-size: 1.8rem; font-weight: 700; text-align: center; border: 3px solid #cbd5e1; border-radius: 16px; padding: 12px; outline: none; transition: 0.2s; background: #f8fafc; color: #0f172a; }
         .scan-input:focus { border-color: var(--accent); background: white; box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.2); }
         .scan-input:disabled { background: #e2e8f0; border-color: transparent; color: #94a3b8; }
         
-        .history-panel { flex: 1.4; background: var(--surface); border-radius: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; overflow: hidden; }
-        .history-header { padding: 20px 25px; border-bottom: 1px solid #f1f5f9; font-weight: 800; color: #64748b; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .clean-table { width: 100%; }
-        .clean-table th, .clean-table td { padding: 15px 20px; text-align: center; }
-        .clean-table tr { border-bottom: 1px solid #f1f5f9; }
-        @keyframes flashRow { 0% { background-color: rgba(59, 130, 246, 0.2); } 100% { background-color: transparent; } }
-        .new-row { animation: flashRow 1s ease-out; }
+        .history-header { background: #ffffff; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; font-weight: 800; color: #334155; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1.5px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
         
-        #history-table tr td:nth-child(1) { font-size: var(--fs-table); font-weight: 800; color: var(--c-blue); line-height: 1.1; text-align: left; }
-        #history-table tr td:nth-child(2) { font-size: calc(var(--fs-table) * 1.5); font-weight: 900; color: #0f172a; letter-spacing: 2px; font-family: 'JetBrains Mono', monospace; }
-        #history-table tr td:nth-child(3) { font-size: 1.2rem; color: #64748b; font-weight: 600; }
+        .table-scroll { overflow-y: auto; flex: 1; min-height: 0; }
+        
+        .clean-table { width: 100%; border-collapse: collapse; }
+        .clean-table tr { border-bottom: 1px solid #f8fafc; transition: background 0.1s; }
+        .clean-table tr:last-child { border-bottom: none; }
+        
+        .clean-table td { 
+            padding: 14px 24px; 
+            vertical-align: middle; 
+            font-size: var(--fs-table); 
+        }
+
+        .h-tag { 
+            display: inline-block; 
+            font-size: calc(var(--fs-table) * 0.65); 
+            font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); background: rgba(59, 130, 246, 0.08); padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; 
+        }
+        .h-sn { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-weight: 700; 
+            font-size: calc(var(--fs-table) * 1.1); 
+            color: #1e293b; letter-spacing: -0.3px; display: block; line-height: 1.2; 
+        }
+        .h-time { 
+            font-family: 'Manrope', sans-serif; 
+            font-weight: 600; 
+            font-size: calc(var(--fs-table) * 0.85); 
+            color: #94a3b8; margin-right: 8px; 
+        }
+        .btn-nice-del { 
+            width: calc(var(--fs-table) * 2.5); height: calc(var(--fs-table) * 2.5); font-size: var(--fs-table);
+            border-radius: 12px; border: none; background: #fef2f2; color: #ef4444; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        .btn-nice-del:hover { background: #fee2e2; transform: translateY(-1px); }
+        .btn-nice-del:active { transform: scale(0.94); background: #fecaca; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-5px); background: #eff6ff; } to { opacity: 1; transform: translateY(0); background: transparent; } }
+        .new-row { animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
         .text-blue { color: var(--c-blue); } .text-purple { color: var(--c-purple); } .text-green { color: var(--c-green); }
         .itr-only { display: none !important; }
         body.mode-itr .itr-only { display: grid !important; } 
         body.mode-itr .itr-flex { display: flex !important; }
-        .btn-del-row { border: 1px solid transparent; background: transparent; color: #94a3b8; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: 0.2s; cursor: pointer; font-size: 1.2rem; }
-        .btn-del-row:hover { background: #fee2e2; color: #ef4444; border-color: #ef4444; }
+        
+        .settings-section { margin-bottom: 20px; }
+        .settings-title { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px; padding-left: 10px; letter-spacing: 1px; }
+        .settings-group { background: rgba(255,255,255,0.7); border-radius: 18px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); }
+        .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-label { display: flex; align-items: center; gap: 12px; font-weight: 700; color: #334155; font-size: 0.95rem; }
+        .settings-label i { color: var(--accent); font-size: 1.2rem; width: 24px; text-align: center; }
+        .settings-control { flex: 1; max-width: 140px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+        
+        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(59,130,246,0.4); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #e2e8f0; border-radius: 3px; }
+        .segment-control { display: flex; background: rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 5px; position: relative; border: 1px solid rgba(255,255,255,0.1); gap: 5px; margin-bottom: 20px; }
+        .segment-item { flex: 1; position: relative; z-index: 2; }
+        .segment-input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .segment-label { display: flex; align-items: center; justify-content: center; padding: 12px 10px; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #cbd5e1; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-transform: uppercase; letter-spacing: 0.5px; user-select: none; }
+        .segment-label:hover { background: rgba(255,255,255,0.05); color: white; }
+        .segment-input:checked + .segment-label { background: var(--accent); color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); transform: translateY(-1px); }
+        .btn-check:checked + .btn-light { background-color: var(--accent); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .nav-pills-custom .nav-link { color: #64748b; background: #f1f5f9; border-radius: 10px; font-weight: 800; padding: 10px 20px; margin-right: 10px; transition: 0.2s; }
+        .nav-pills-custom .nav-link.active { color: #fff; background: var(--accent); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
+
+        .shutdown-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.5s ease-out forwards; }
+        .warning-tri { font-size: 8rem; color: #ef4444; animation: pulse-red 1s infinite; text-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
+        @keyframes pulse-red { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .mobile-header-row { display: none; }
+        .mobile-menu-btn { display: none; }
+        
+        #ptr { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 80px; display: flex; align-items: center; justify-content: center; z-index: 2000; pointer-events: none; opacity: 0; transform: translateY(-20px);
+        }
+        #ptr i { font-size: 2rem; color: var(--accent); background: white; border-radius: 50%; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.1s; }
+        body.ptr-active #ptr i { color: #ffffff; background: var(--success); transform: scale(1.2) !important; }
+        body.ptr-active #ptr { top: 20px; }
+        body.ptr-active #ptr i { display: block; }
 
         /* MODALS */
-        .modal-transparent .modal-content { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.4); border-radius: 24px; }
-        .modal-body { max-height: 70vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .modal-transparent .modal-content { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.4); border-radius: 24px; }
         .modal-nice { border-radius: 24px; border: none; overflow: hidden; background: #f8fafc; }
         .modal-nice .modal-content { background: #f8fafc; border: none; }
         .modern-input { background: #ffffff; border: 2px solid #e2e8f0; border-radius: 14px; padding: 14px 18px; font-weight: 700; color: #334155; font-size: 1.1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
@@ -155,110 +396,321 @@
         .input-dark:focus { background: rgba(0,0,0,0.5); color: white; border-color: var(--accent); box-shadow: none; }
         .input-dark[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
 
-        .settings-section { margin-bottom: 25px; }
-        .settings-title { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 8px; padding-left: 10px; letter-spacing: 1px; }
-        .settings-group { background: rgba(255,255,255,0.7); border-radius: 18px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); }
-        .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid rgba(0,0,0,0.05); }
-        .settings-row:last-child { border-bottom: none; }
-        .settings-label { display: flex; align-items: center; gap: 12px; font-weight: 700; color: #334155; font-size: 1rem; }
-        .settings-label i { color: var(--accent); font-size: 1.2rem; width: 24px; text-align: center; }
-        .settings-control { flex: 1; max-width: 160px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-        
-        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(59,130,246,0.4); }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #e2e8f0; border-radius: 3px; }
-        
-        .segment-control { display: flex; background: rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 5px; position: relative; border: 1px solid rgba(255,255,255,0.1); gap: 5px; margin-bottom: 20px; }
-        .segment-item { flex: 1; position: relative; z-index: 2; }
-        .segment-input { position: absolute; opacity: 0; width: 0; height: 0; }
-        .segment-label { display: flex; align-items: center; justify-content: center; padding: 12px 10px; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #cbd5e1; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-transform: uppercase; letter-spacing: 0.5px; user-select: none; }
-        .segment-label:hover { background: rgba(255,255,255,0.05); color: white; }
-        .segment-input:checked + .segment-label { background: var(--accent); color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); transform: translateY(-1px); }
-
-        .btn-check:checked + .btn-light { background-color: var(--accent); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .nav-pills-custom .nav-link { color: #64748b; background: #f1f5f9; border-radius: 10px; font-weight: 800; padding: 10px 20px; margin-right: 10px; transition: 0.2s; }
-        .nav-pills-custom .nav-link.active { color: #fff; background: var(--accent); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
-
-        .shutdown-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fadeIn 0.5s ease-out forwards; }
-        .warning-tri { font-size: 8rem; color: #ef4444; animation: pulse-red 1s infinite; text-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
-        @keyframes pulse-red { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); z-index: 1040; opacity: 0; transition: opacity 0.3s; }
-        .overlay.active { display: block; opacity: 1; }
-        .mobile-header-row { display: none; }
-        .mobile-menu-btn { display: none; }
-
-        /* --- MOBILE OPTIMIZATION --- */
-        @media (max-width: 768px) {
-            body { flex-direction: column; overflow: hidden; }
-            .main-layout { padding-bottom: 80px; }
-            .mobile-menu-btn { display: block !important; }
-            .top-bar { display: none; }
-            
-            .sidebar { position: fixed; top: 0; left: 0; height: 100%; width: 85%; max-width: 340px; transform: translateX(-100%); box-shadow: 10px 0 40px rgba(0,0,0,0.5); border-right: none; }
-            .sidebar.active { transform: translateX(0); }
-            .sidebar-inner { width: 100%; padding: 15px; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
-            
-            .mobile-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
-            
-            .dashboard-content { padding: 12px; padding-bottom: 90px; }
-            
-            /* COMPACT STATS GRID */
-            .stats-grid.itr-only { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 15px; }
-            .stat-card { padding: 8px 4px; min-width: 0; height: auto; border-radius: 12px; }
-            .stat-val-sub { font-size: 1.2rem !important; }
-            .stat-label { font-size: 0.6rem; letter-spacing: 0; margin-top: 4px; }
-            
-            .mobile-view-section { display: none; }
-            .mobile-view-section.active { display: flex; flex-direction: column; gap: 15px; }
-            
-            /* HERO CARD (TOTAL) */
-            .stat-card.main { min-height: 140px; padding: 15px; border-radius: 16px; }
-            .stat-val-big { font-size: 3.5rem !important; line-height: 1; }
-            .stat-label-main { margin-top: 5px; font-size: 0.9rem; }
-            
-            /* INPUT FIELD */
-            .scanner-panel { padding: 15px; border-radius: 16px; }
-            .scan-input { height: 60px; font-size: 1.4rem; border-width: 3px; border-radius: 12px; }
-            
-            /* BOTTOM NAVIGATION */
-            .bottom-nav { 
-                position: fixed; bottom: 0; left: 0; width: 100%; 
-                background: rgba(255,255,255,0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); 
-                border-top: 1px solid rgba(0,0,0,0.08); 
-                display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; 
-                padding: 10px 5px calc(5px + var(--safe-bottom)) 5px; 
-                z-index: 1060; box-shadow: 0 -5px 25px rgba(0,0,0,0.06); 
-            }
-            .nav-item-mobile { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #64748b; background: none; border: none; gap: 3px; transition: all 0.2s; position: relative; padding: 6px; border-radius: 12px; }
-            .nav-item-mobile i { font-size: 1.4rem; z-index: 2; margin-bottom: 0; }
-            .nav-item-mobile span { font-size: 0.65rem; font-weight: 700; z-index: 2; }
-            .nav-item-mobile.active { color: var(--accent); transform: translateY(-1px); }
-            .nav-item-mobile.active::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 100%; background: rgba(59, 130, 246, 0.1); border-radius: 10px; z-index: 1; }
-            
-            /* HISTORY LIST MOBILE */
-            .clean-table thead { display: none; }
-            .clean-table tr { 
-                display: flex; justify-content: space-between; align-items: center; 
-                background: white; margin-bottom: 8px; border-radius: 12px; padding: 12px; 
-                border: 1px solid #f1f5f9; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-            }
-            .clean-table td { display: block; border: none; padding: 0 !important; text-align: left !important; }
-            #history-table tr td:nth-child(1) { font-size: 0.8rem !important; flex: 1; color: var(--c-blue); font-weight: 700; text-transform: uppercase; }
-            #history-table tr td:nth-child(2) { font-size: 1.2rem !important; margin-right: 10px; color: #0f172a; font-weight: 800; font-family: 'JetBrains Mono'; }
-            #history-table tr td:nth-child(3) { display: none; } /* Hide exact time on mobile to save space */
-            
-            .btn-del-row { width: 32px; height: 32px; background: #f8fafc; border: 1px solid #e2e8f0; }
+        /* --- СТИЛИ ДЛЯ ИЗМЕНЕНИЯ РАЗМЕРА БЛОКОВ (RESIZER) --- */
+        .resizable-box {
+            position: relative;
+            /* Базовые минимумы, чтобы блоки не исчезали совсем */
+            min-width: 250px; 
+            min-height: 150px;
+            will-change: width, height, flex-basis; /* Оптимизация производительности */
         }
+
+        /* Указываем минимальные размеры для соседей, чтобы их нельзя было раздавить */
+        .stat-card.main { min-width: 250px; }
+        .scanner-panel { min-height: 140px; }
+        .history-panel { min-height: 150px; }
+
+        .resizer-handle {
+            width: 25px; /* Чуть больше зона захвата */
+            height: 25px;
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            cursor: nwse-resize; 
+            z-index: 20;
+            /* Создаем красивый "треугольник" через градиент */
+            background: radial-gradient(circle at bottom right, var(--accent) 0%, var(--accent) 15%, transparent 16%);
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        
+        .resizer-handle:hover { 
+            transform: scale(1.2); /* Эффект при наведении на ручку */
+        }
+        @media (min-width: 769px) {
+            .resizable-box:hover .resizer-handle { opacity: 1; }
+            .left-column { flex-shrink: 0; } 
+        }
+
+        /* --- MOBILE STYLES (ИСПРАВЛЕННЫЙ СКРОЛЛ) --- */
+        @media (max-width: 768px) {
+            /* 1. РАЗРЕШАЕМ НАТИВНЫЙ СКРОЛЛ БРАУЗЕРА */
+            body { 
+                flex-direction: column; 
+                background: #F0F4F9; 
+                
+                /* Важно: разрешаем скролл на body */
+                overflow-y: auto !important; 
+                overflow-x: hidden;
+                
+                /* Важно: разрешаем стандартное поведение (обновление) */
+                overscroll-behavior-y: auto !important; 
+                
+                /* Важно: высота должна зависеть от контента */
+                height: auto !important;
+                min-height: 100vh;
+            }
+            .resizer-handle { display: none; }
+
+            /* 2. УБИРАЕМ ВНУТРЕННИЙ СКРОЛЛ КОНТЕЙНЕРА */
+            .main-layout { 
+                padding-bottom: 90px; /* Отступ под навигацию */
+                background: #F0F4F9; 
+                
+                /* Контейнер просто растягивается по высоте контента */
+                height: auto !important; 
+                overflow: visible !important; 
+            }
+            
+            .mobile-menu-btn, .top-bar { display: none !important; }
+
+            /* === ЕДИНЫЕ ПРАВИЛА АНИМАЦИИ (GPU) === */
+            .sidebar, .modal-dialog {
+                transform: translate3d(0, 105%, 0) !important; 
+                will-change: transform;
+                backface-visibility: hidden;
+                perspective: 1000px;
+                transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1) !important;
+                box-shadow: none !important;
+            }
+
+            .sidebar.active, .modal.show .modal-dialog {
+                transform: translate3d(0, 0, 0) !important;
+            }
+
+            /* 1. НАСТРОЙКА САЙДБАРА */
+            .sidebar { 
+                position: fixed; top: 0; left: 0; 
+                height: 100%; width: 100%; 
+                border: none; z-index: 1100; 
+                background-color: var(--sidebar-bg);
+                /* Сайдбар фиксированный, у него свой внутренний скролл */
+                overflow: hidden; 
+            }
+            .sidebar-inner { 
+                width: 100%; height: 100%; padding: 15px; 
+                padding-bottom: 90px !important;
+            }
+
+            /* 2. НАСТРОЙКА МОДАЛОК */
+            .modal { padding: 0 !important; z-index: 1100; overflow: hidden; }
+            .modal-dialog {
+                margin: 0 !important;
+                max-width: none !important;
+                width: 100% !important;
+                height: 100% !important;
+            }
+            .modal-content {
+                height: 100% !important;
+                border: none !important;
+                border-radius: 0 !important;
+                background: #F0F4F9 !important;
+                padding-bottom: 85px; 
+            }
+            
+            .modal-backdrop { display: none !important; } 
+            .modal.fade .modal-dialog { transition: none; } 
+            .modal-header { background: #F0F4F9; padding: 15px; border-bottom: none; }
+            .modal-body { padding: 15px !important; background: #F0F4F9; }
+            #settingsModal .modal-dialog { max-height: none; }
+
+            /* 3. ОПТИМИЗАЦИЯ ЭЛЕМЕНТОВ */
+            .order-card { 
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.05);
+                padding: 10px 14px; margin-bottom: 6px; border-radius: 14px; 
+                min-height: 55px; display: flex; align-items: center; justify-content: space-between; 
+            }
+            .stat-card.main, .scanner-panel, .history-panel {
+                box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                border: 1px solid rgba(0,0,0,0.03);
+            }
+
+            /* ВАЖНО: Области прокрутки */
+            .orders-wrapper { flex: 1; overflow-y: auto; } /* Скролл внутри меню */
+            
+            .sidebar-footer { margin-top: auto; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
+            body.mode-itr .sidebar-footer .itr-only { display: block !important; margin-top: 10px; }
+            .mobile-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+            .dashboard-content { padding: 10px; gap: 10px; height: 100%; display: flex; flex-direction: column; }
+            .work-section { flex-direction: column; gap: 10px; flex: 1; overflow: visible; }
+            .d-none-mob { display: none !important; }
+            .left-column { flex: 1; gap: 10px; min-height: 0; display: contents !important;}
+            .stat-card.main { 
+                order: 2; 
+                flex: none !important; /* Фиксированный размер, не сжимать */
+                height: 80px !important;
+                min-height: 80px !important;
+                margin-bottom: 0;
+                background: #ffffff;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+                z-index: 10;
+            }
+            .stat-val-big { font-size: 2.2rem !important; line-height: 1; }
+            .stat-label-main { margin-top: 2px; font-size: 0.65rem; }
+            .scanner-panel { order: 1; margin-bottom: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 10px; border-radius: 12px; flex: 1; background: white; }
+            #scan-status { font-size: 0.7rem; margin-bottom: 8px !important; }
+            .scan-input { height: 45px; font-size: 1.2rem; border-width: 2px; border-radius: 8px; padding: 5px; }
+            #scan-msg { margin-top: 5px !important; font-size: 0.9rem; height: 18px; }
+            .history-header { padding: 10px 15px; font-size: 0.8rem; background: transparent; }
+            .history-panel { 
+                order: 3; 
+                background: white; 
+                border-radius: 12px;
+                flex: 1; /* Занимает оставшееся место, если есть */
+            }
+            .clean-table td { padding: 12px 15px; }
+            .h-sn { font-size: 1.05rem; }
+            .btn-nice-del { width: 38px; height: 38px; }
+            .stats-grid.itr-only { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 0; flex: 0 0 auto; }
+            
+            .watermark-loc { 
+                position: absolute !important;
+                top: 50% !important; left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                right: auto !important;
+                font-size: 3.5rem !important; font-weight: 900 !important;
+                color: #ffffff !important; opacity: 0.2 !important;
+                background: transparent !important; padding: 0 !important; border: none !important;
+                z-index: 1 !important; pointer-events: none; white-space: nowrap;
+            }
+            .order-content-wrap { 
+                flex-direction: column; align-items: flex-start; justify-content: center; 
+                width: 100%; gap: 2px; padding-right: 45px; position: relative; z-index: 5; 
+            }
+            .order-title { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-bottom: 0; line-height: 1.2; }
+            .order-meta { font-size: 0.85rem; font-weight: 700; color: rgba(255,255,255,0.85); padding: 0; background: transparent; }
+            .order-progress-bg { opacity: 1; background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.2)); }
+            .order-controls { display: flex; right: 5px; }
+            .btn-mini { width: 32px; height: 32px; font-size: 1rem; }
+
+            .bottom-nav { 
+                height: 80px; 
+                background: #F0F4F9; 
+                border-top: none;
+                box-shadow: 0 -1px 10px rgba(0,0,0,0.03);
+                display: grid; 
+                grid-template-columns: repeat(5, 1fr); 
+                padding: 0; padding-bottom: var(--safe-area-bottom, 0px); 
+                z-index: 2000; align-items: center;
+                position: fixed; bottom: 0; left: 0; width: 100%;
+                will-change: transform;
+            }
+
+            .nav-item-mobile { 
+                display: flex; flex-direction: column; align-items: center; justify-content: center; 
+                background: transparent; border: none; gap: 4px; height: 100%;
+                padding-top: 12px; padding-bottom: 16px; position: relative;
+            }
+            .nav-item-mobile i { 
+                display: flex; align-items: center; justify-content: center;
+                width: 64px; height: 32px; border-radius: 16px;
+                font-size: 1.5rem !important; color: #444746; margin-bottom: 0; z-index: 2;
+                transition: background-color 0.15s ease-out;
+            }
+            .nav-item-mobile span { font-size: 0.75rem; font-weight: 600; color: #444746; z-index: 2; letter-spacing: 0.4px; }
+            .nav-item-mobile.active i { background-color: #C2E7FF; color: #001D35; }
+            .nav-item-mobile.active span { color: #1F1F1F; font-weight: 800; }
+            .nav-item-mobile:active i { transform: scale(0.95); background-color: #dbeafe; transition: none; }
+        }
+            
         @keyframes fadeInNav { from { opacity: 0; width: 40px; } to { opacity: 1; width: 50px; } }
-        @media (min-width: 769px) { .bottom-nav { display: none; } }
+        @media (min-width: 769px) { .bottom-nav { display: none; } .chart-container { height: 300px; } }
+
+        /* ЗАСТАВКА (SPLASH SCREEN) */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #0f172a; 
+            z-index: 999999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.5s ease-out, visibility 0.5s;
+        }
+        
+        body.app-loaded #splash-screen {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .splash-logo {
+            position: relative;
+            width: 80px; height: 80px;
+            margin-bottom: 20px;
+        }
+        
+        .logo-frame {
+            position: absolute; inset: 0;
+            border: 4px solid #334155;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            background: #1e293b;
+            overflow: hidden;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 40%;
+            background: linear-gradient(to bottom, transparent, rgba(59, 130, 246, 0.5) 90%, #3b82f6 100%);
+            animation: scanner-move 1.5s infinite linear;
+            opacity: 0.8;
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.6);
+        }
+
+        .logo-inner {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem;
+            color: #cbd5e1;
+            z-index: 2;
+        }
+
+        .splash-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: white;
+            letter-spacing: -2px;
+            margin-bottom: 5px;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .splash-subtitle {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            animation: pulse-text 1.5s infinite;
+        }
+
+        @keyframes scanner-move {
+            0% { top: -40%; }
+            100% { top: 100%; }
+        }
+        @keyframes pulse-text {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
     </style>
 </head>
 <body class="mode-worker" id="body">
 
-    <!-- OVERLAY -->
-    <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+    <!-- ЗАСТАВКА -->
+    <div id="splash-screen">
+        <div class="splash-logo">
+            <div class="logo-frame">
+                <div class="scan-line"></div>
+            </div>
+            <div class="logo-inner">
+                <i class="bi bi-box-seam-fill"></i>
+            </div>
+        </div>
+        <div class="splash-title">СКТ-ПРО</div>
+        <div class="splash-subtitle">Запуск...</div>
+    </div>
+
+    <div id="ptr"><i class="bi bi-arrow-repeat"></i></div>
+    <div class="overlay" id="overlay" onclick="closeAllMenus()"></div>
 
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
@@ -267,30 +719,50 @@
                 <button class="btn btn-outline-light fw-bold rounded-pill px-3 py-1" onclick="toggleMode()">
                     <i class="bi bi-arrow-repeat"></i> <span id="mobModeText">РАБОЧИЙ</span>
                 </button>
-                <button class="btn text-white fs-2 p-0 border-0" onclick="toggleSidebar()">
+                <button class="btn text-white fs-2 p-0 border-0" onclick="closeAllMenus()">
                     <i class="bi bi-x"></i>
                 </button>
             </div>
 
+            <div class="wizard-container">
+                <input type="text" id="wiz-input" class="wizard-input" placeholder="+ Создать заказ" autocomplete="off">
+                <div id="wiz-settings" class="wizard-settings">
+                    <div class="wiz-types">
+                        <div id="wt-0" class="wiz-type active">Л1</div>
+                        <div id="wt-1" class="wiz-type">Л2</div>
+                        <div id="wt-2" class="wiz-type">СТ</div>
+                    </div>
+                    <div id="wd-box" class="wiz-dups">Дубликаты: НЕТ</div>
+                    <div class="wiz-hint">
+                        <i class="bi bi-arrow-left-right"></i> Участок &nbsp;|&nbsp; 
+                        <i class="bi bi-arrow-down-up"></i> Дубли
+                    </div>
+                </div>
+            </div>
+
             <div class="sidebar-header-group">
-                <button class="btn-create" data-bs-toggle="modal" data-bs-target="#addOrderModal">
-                    <i class="bi bi-plus-lg"></i> Новый заказ
-                </button>
                 <button class="btn-all-scans" id="btn-all-scans" onclick="showAllScans()">
                     <i class="bi bi-list-columns-reverse"></i> Все записи
                 </button>
-                <input type="text" class="sidebar-search" placeholder="Поиск заказа..." id="order-search" oninput="filterOrders()">
+                <input type="text" class="sidebar-search" placeholder="Поиск..." id="order-search" oninput="filterOrders()">
             </div>
 
             <div class="orders-wrapper" id="orders-container"></div>
             
             <div class="sidebar-footer">
-                <button class="btn-tool" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                <button class="btn-tool" onclick="openSettings()">
                     <i class="bi bi-gear-fill"></i> Настройки
                 </button>
-                <button class="btn-tool" data-bs-toggle="modal" data-bs-target="#exportModal">
+                
+                <!-- КНОПКА ВЫХОДНЫЕ -->
+                <button class="btn-tool" onclick="switchMobileTab('salary')">
+                    <i class="bi bi-wallet2"></i> Выходные
+                </button>
+
+                <button class="btn-tool" data-bs-toggle="modal" data-bs-target="#exportModal" onclick="closeSidebar()">
                     <i class="bi bi-file-earmark-spreadsheet"></i> Скачать отчет
                 </button>
+                
                 <div class="itr-only">
                     <button class="btn-tool" onclick="openChartModal()">
                         <i class="bi bi-pie-chart-fill"></i> Статистика
@@ -310,6 +782,18 @@
             <button class="mode-btn" id="modeBtn" onclick="toggleMode()">
                  <span class="mode-text-label">Режим: </span><span id="modeText">Рабочий</span>
             </button>
+
+<!-- ИНДИКАТОР ОФФЛАЙН ОЧЕРЕДИ -->
+<div id="offline-indicator" class="d-none align-items-center gap-2 me-3 text-warning fw-bold" style="animation: pulse-text 2s infinite;">
+    <i class="bi bi-wifi-off fs-4"></i>
+    <span style="font-size: 1.2rem;">ОЧЕРЕДЬ: </span>
+    <span id="offline-count" style="font-size: 1.2rem;">0</span>
+</div>
+<!-- ИНДИКАТОР СТАТУСА СЕТИ -->
+<div id="net-status" class="d-flex align-items-center gap-2 me-3 fw-bold small text-uppercase" style="color: #10b981;">
+    <div id="net-dot" style="width: 12px; height: 12px; border-radius: 50%; background-color: #10b981; box-shadow: 0 0 10px #10b981;"></div>
+    <span id="net-text">ONLINE</span>
+</div>
             <div class="d-flex align-items-center gap-2">
                 <div class="info-block text-end me-2">
                     <div class="ip-display">IP: {{ server_url.split('://')[1] }}</div>
@@ -323,82 +807,79 @@
 
         <div class="dashboard-content">
             <div class="stats-grid itr-only">
-                <div class="stat-card">
-                    <div class="stat-val-sub text-blue" id="stat-c1">0</div>
-                    <div class="stat-label">Линия 1</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-val-sub text-purple" id="stat-c2">0</div>
-                    <div class="stat-label">Линия 2</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-val-sub text-green" id="stat-stapel">0</div>
-                    <div class="stat-label">Стапель</div>
-                </div>
+                <div class="stat-card"><div class="stat-val-sub text-blue" id="stat-c1">0</div><div class="stat-label">Линия 1</div></div>
+                <div class="stat-card"><div class="stat-val-sub text-purple" id="stat-c2">0</div><div class="stat-label">Линия 2</div></div>
+                <div class="stat-card"><div class="stat-val-sub text-green" id="stat-stapel">0</div><div class="stat-label">Стапель</div></div>
             </div>
 
             <div class="work-section">
-                <!-- LEFY COLUMN -->
-                <div class="left-column mobile-view-section active" id="mob-home">
-                    <div class="stat-card main">
-                        <div class="stat-val-big" id="stat-total">0</div>
-                        <div class="stat-label-main" id="stat-total-label">Всего сегодня</div>
+                <!-- ЛЕВАЯ КОЛОНКА (Добавлен класс resizable-box и handle) -->
+                <div class="left-column view-home-el resizable-box" id="left-col-wrapper">
+                    <div class="resizer-handle" id="resizer-col"></div> <!-- РУЧКА -->
+
+                    <!-- БЛОК ИСТОРИИ (Добавлен класс resizable-box и handle) -->
+                    <div class="history-panel view-history-el resizable-box" id="mob-history">
+                        <div class="resizer-handle" id="resizer-hist"></div> <!-- РУЧКА -->
+                        
+                        <div class="history-header">
+                            <span>История сканирований</span>
+                            <i class="bi bi-clock-history text-muted fs-5"></i>
+                        </div>
+                        <div class="table-scroll">
+                            <table class="clean-table">
+                                <tbody id="history-table"></tbody>
+                            </table>
+                        </div>
                     </div>
 
-                    <div class="scanner-panel">
+                    <!-- БЛОК СКАНЕРА -->
+                    <div class="scanner-panel view-home-el">
                         <div id="scan-status" class="fw-bold text-muted text-uppercase mb-3 small" style="letter-spacing: 1px;">Выберите заказ</div>
-                        <input type="text" id="serial-input" class="scan-input" placeholder="СКАНИРОВАТЬ" disabled autocomplete="off">
+                        <input type="text" id="serial-input" class="scan-input" placeholder="СКАНИРОВАТЬ" disabled autocomplete="off" inputmode="none">
                         <div id="scan-msg" class="mt-3 fw-bold small text-center" style="height: 24px; font-size: 1.2rem;"></div>
                     </div>
                 </div>
 
-                <!-- RIGHT COLUMN -->
-                <div class="history-panel mobile-view-section" id="mob-history">
-                    <div class="history-header">
-                        <span>ИСТОРИЯ</span>
-                    </div>
-                    <div class="table-scroll" style="overflow-y:auto; flex:1;">
-                        <table class="clean-table">
-                            <thead>
-                                <tr>
-                                    <th width="35%" style="text-align: left;">ЗАКАЗ</th>
-                                    <th width="40%">SN</th>
-                                    <th width="20%">ВРЕМЯ</th>
-                                    <th width="5%"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="history-table"></tbody>
-                        </table>
-                    </div>
+                <!-- ПРАВАЯ КОЛОНКА -->
+                <div class="stat-card main view-home-el" id="stat-card-main">
+                    <div class="stat-val-big" id="stat-total">0</div>
+                    <div class="stat-label-main" id="stat-total-label">Всего сегодня</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- NEW BOTTOM NAV (MOBILE) -->
+    <!-- BOTTOM NAV -->
     <div class="bottom-nav">
-        <button class="nav-item-mobile" onclick="openChartModal()">
+        <button class="nav-item-mobile active" onclick="switchMobileTab('scan')">
+            <i class="bi bi-house-door-fill"></i>
+            <span>Главная</span>
+        </button>
+        
+        <button class="nav-item-mobile" onclick="switchMobileTab('menu')"> 
+            <i class="bi bi-list-task"></i>
+            <span>Заказы</span>
+        </button>
+        
+        <button class="nav-item-mobile" onclick="switchMobileTab('stat')">
             <i class="bi bi-bar-chart-fill"></i>
             <span>Стат</span>
         </button>
-        <button class="nav-item-mobile active" onclick="switchMobileTab('home')">
-            <i class="bi bi-upc-scan"></i>
-            <span>Скан</span>
-        </button>
-        <button class="nav-item-mobile" onclick="toggleSidebar()"> 
-            <i class="bi bi-list-task"></i>
-            <span>Меню</span>
-        </button>
-        <button class="nav-item-mobile" data-bs-toggle="modal" data-bs-target="#settingsModal"> 
+        
+        <button class="nav-item-mobile" onclick="switchMobileTab('settings')"> 
             <i class="bi bi-gear-fill"></i>
             <span>Настр</span>
         </button>
+
+        <button class="nav-item-mobile" onclick="switchMobileTab('salary')"> 
+            <i class="bi bi-wallet2"></i>
+            <span>Выходные</span>
+        </button>
     </div>
 
-    <!-- MODALS -->
+    <!-- МОДАЛЬНЫЕ ОКНА -->
     <div class="modal fade" id="qrModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-4 p-4 text-center"><div id="qrcode" class="d-flex justify-content-center mb-3"></div><div class="fw-bold font-monospace" style="word-break:break-all;">{{ server_url }}</div></div></div></div>
     
-    <!-- SETTINGS MODAL -->
     <div class="modal fade modal-transparent" id="settingsModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content shadow">
@@ -406,7 +887,7 @@
                     <h4 class="fw-bold m-0 text-dark">Настройки</h4>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body p-4" id="settings-body-content">
                     <div class="settings-section">
                         <div class="settings-title">Система</div>
                         <div class="settings-group">
@@ -416,51 +897,43 @@
                             </div>
                             <div class="settings-row">
                                 <div class="settings-label"><i class="bi bi-volume-up-fill"></i> Звук</div>
-                                <div class="settings-control">
-                                    <input type="range" min="0" max="1" step="0.1" id="volRange" oninput="updateVolume(this.value)">
-                                </div>
+                                <div class="settings-control"><input type="range" min="0" max="1" step="0.1" id="volRange" oninput="updateVolume(this.value)" onchange="autoSaveSettings()"></div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="settings-section">
-                        <div class="settings-title">График работы</div>
-                        <div class="settings-group p-3">
-                            <div class="d-flex gap-2 mb-3">
-                                <div class="flex-grow-1">
-                                    <label class="small text-muted fw-bold">Начало</label>
-                                    <input type="time" id="set-shift-start" class="form-control modern-input text-center">
-                                </div>
-                                <div class="flex-grow-1">
-                                    <label class="small text-muted fw-bold">Конец</label>
-                                    <input type="time" id="set-shift-end" class="form-control modern-input text-center">
-                                </div>
+                        <div class="settings-title">Интерфейс</div>
+                        <div class="settings-group">
+                            <div class="settings-row">
+                                <div class="settings-label"><i class="bi bi-fonts"></i> Общий шрифт</div>
+                                <div class="settings-control"><input type="range" min="0.8" max="1.3" step="0.05" id="rng-base" oninput="setFont('base', this.value)" onchange="autoSaveSettings()"></div>
                             </div>
-                            <div class="settings-title mt-2 mb-2">Перерывы</div>
-                            <div id="breaks-container"></div>
-                            <button class="btn btn-outline-primary w-100 mt-2 fw-bold" onclick="addBreakRow()">+ Добавить перерыв</button>
+                            <div class="settings-row">
+                                <div class="settings-label"><i class="bi bi-type-h1"></i> Заголовки</div>
+                                <div class="settings-control"><input type="range" min="0.6" max="1.5" step="0.05" id="rng-label" oninput="setFont('label', this.value)" onchange="autoSaveSettings()"></div>
+                            </div>
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-123"></i> Главная цифра</div><div class="settings-control"><input type="range" min="3" max="120" step="1" id="rng-stat" oninput="setFont('stat', this.value)" onchange="autoSaveSettings()"></div></div>
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-menu-button-wide"></i> Шрифт меню</div><div class="settings-control"><input type="range" min="0.8" max="1.4" step="0.05" id="rng-sidebar" oninput="setFont('sidebar', this.value)" onchange="autoSaveSettings()"></div></div>
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-table"></i> Шрифт таблицы</div><div class="settings-control"><input type="range" min="1" max="2.5" step="0.1" id="rng-table" oninput="setFont('table', this.value)" onchange="autoSaveSettings()"></div></div>
+                            <div class="settings-row"><div class="settings-label"><i class="bi bi-phone"></i> Меню (Моб)</div><div class="settings-control"><input type="range" min="1.2" max="2.5" step="0.1" id="rng-nav" oninput="setNavSize(this.value)" onchange="autoSaveSettings()"></div></div>
                         </div>
                     </div>
 
                     <div class="settings-section">
-                        <div class="settings-title">Интерфейс</div>
-                        <div class="settings-group">
-                            <div class="settings-row"><div class="settings-label"><i class="bi bi-123"></i> Главная цифра</div><div class="settings-control"><input type="range" min="3" max="45" step="0.5" id="rng-stat" oninput="setFont('stat', this.value)"></div></div>
-                            <div class="settings-row"><div class="settings-label"><i class="bi bi-menu-button-wide"></i> Шрифт меню</div><div class="settings-control"><input type="range" min="0.8" max="1.4" step="0.05" id="rng-sidebar" oninput="setFont('sidebar', this.value)"></div></div>
-                            <div class="settings-row"><div class="settings-label"><i class="bi bi-table"></i> Шрифт таблицы</div><div class="settings-control"><input type="range" min="1" max="2.5" step="0.1" id="rng-table" oninput="setFont('table', this.value)"></div></div>
-                            <div class="settings-row"><div class="settings-label"><i class="bi bi-phone"></i> Меню (Моб)</div><div class="settings-control"><input type="range" min="1.2" max="2.5" step="0.1" id="rng-nav" oninput="setNavSize(this.value)"></div></div>
+                        <div class="settings-title">График работы</div>
+                        <div class="settings-group p-3">
+                            <div class="d-flex gap-2 mb-3"><div class="flex-grow-1"><label class="small text-muted fw-bold">Начало</label><input type="time" id="set-shift-start" class="form-control modern-input text-center" onchange="autoSaveSettings()"></div><div class="flex-grow-1"><label class="small text-muted fw-bold">Конец</label><input type="time" id="set-shift-end" class="form-control modern-input text-center" onchange="autoSaveSettings()"></div></div>
+                            <div class="settings-title mt-2 mb-2">Перерывы</div><div id="breaks-container"></div><button class="btn btn-outline-primary w-100 mt-2 fw-bold" onclick="addBreakRow()">+ Добавить перерыв</button>
                         </div>
                     </div>
                     
-                    <div class="d-grid mt-4">
-                        <button class="btn btn-primary rounded-4 py-3 fw-bold shadow-sm" onclick="saveAndCloseSettings()">Сохранить и закрыть</button>
-                    </div>
+                    <div class="text-center mt-3 text-muted small"><i class="bi bi-check2-circle"></i> Настройки сохраняются автоматически</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- SHUTDOWN MODAL -->
     <div class="modal fade" id="shutdownModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content modal-nice shadow border-0" style="background: #1e293b;">
@@ -473,7 +946,6 @@
         </div>
     </div>
 
-    <!-- GENERIC DELETE MODAL -->
     <div class="modal fade" id="confirmModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content modal-nice shadow border-0" style="background: #1e293b;">
@@ -511,32 +983,99 @@
             <div class="modal-content modal-nice shadow p-4">
                 <div class="text-center mb-4"><h4 class="fw-bold">Редактирование</h4></div>
                 <input type="hidden" id="edit-id">
+                
                 <div class="mb-3"><label class="small text-muted fw-bold ms-2">Заказ</label><input type="text" id="edit-name" class="form-control modern-input"></div>
-                <div class="mb-4"><label class="small text-muted fw-bold ms-2">План</label><input type="number" id="edit-target" class="form-control modern-input"></div>
+                <div class="mb-3"><label class="small text-muted fw-bold ms-2">План</label><input type="number" id="edit-target" class="form-control modern-input"></div>
+                
+                <div class="d-flex justify-content-between align-items-center p-3 rounded-4 mb-4 bg-white border">
+                    <div class="fw-bold text-muted">Разрешить дубликаты</div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="edit-dups" style="width: 3em; height: 1.5em;">
+                    </div>
+                </div>
+
                 <div class="mb-4 pt-3 border-top"><label class="small text-muted fw-bold ms-2">Факт (Коррекция)</label><input type="number" id="edit-scanned" class="form-control modern-input" style="background: #eef2ff;"></div>
                 <button class="btn btn-primary w-100 fw-bold py-3 rounded-4 fs-5" onclick="saveOrderEdit()">СОХРАНИТЬ</button>
             </div>
         </div>
     </div>
     
+    <!-- МОДАЛКА ВЫХОДНЫЕ (Строгий стиль) -->
+    <div class="modal fade" id="salaryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0" style="border-radius: 20px; background-color: #f8fafc;">
+                <!-- Заголовок убрали для строгости, оставили только кнопку закрытия -->
+                <div class="position-absolute top-0 end-0 p-3 z-3">
+                    <button type="button" class="btn-close" onclick="switchMobileTab('scan')"></button>
+                </div>
+
+                <div class="modal-body p-5 text-center">
+                    
+                    <!-- ЭКРАН БЛОКИРОВКИ -->
+                    <div id="salary-lock-screen" class="d-flex flex-column align-items-center justify-content-center">
+                        <div class="mb-4">
+                            <i class="bi bi-lock-fill text-secondary" style="font-size: 2rem;"></i>
+                        </div>
+                        
+                        <h5 class="fw-bold text-dark mb-4">Вход ограничен</h5>
+                        
+                        <div class="position-relative w-100" style="max-width: 200px;">
+                            <input type="password" 
+                                   id="salary-pass-input" 
+                                   class="form-control text-center fw-bold bg-white border shadow-sm" 
+                                   style="font-size: 2rem; letter-spacing: 8px; height: 60px; border-radius: 12px;" 
+                                   maxlength="4" 
+                                   inputmode="numeric" 
+                                   placeholder="••••"
+                                   autocomplete="off">
+                                   
+                            <!-- Сообщение об ошибке -->
+                            <div id="salary-error" class="text-danger fw-bold small mt-3 position-absolute start-0 end-0" 
+                                 style="opacity: 0; transition: opacity 0.2s;">
+                                Неверный код
+                            </div>
+                        </div>
+                        
+                        <div class="text-muted small mt-4 opacity-50">Введите 4 цифры</div>
+                    </div>
+
+                    <!-- КОНТЕНТ (СКРЫТ) -->
+                    <div id="salary-content" class="d-none text-start">
+                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                            <h4 class="fw-bold m-0">Выходные</h4>
+                            <button class="btn btn-sm btn-light text-danger fw-bold bg-white border" onclick="lockSalary()">
+                                <i class="bi bi-lock-fill"></i> Выйти
+                            </button>
+                        </div>
+                        
+                        <!-- Заглушка контента -->
+                        <div class="p-4 text-center text-muted border border-dashed rounded-4" style="background: rgba(0,0,0,0.02);">
+                            <i class="bi bi-table fs-1 d-block mb-2 text-primary opacity-50"></i>
+                            <span class="fw-bold d-block text-dark">Данные загружаются...</span>
+                            <div class="small mt-2">Здесь будет таблица смен и оплат.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade modal-dark" id="exportModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow p-4">
                 <div class="d-flex justify-content-between align-items-center mb-4"><h5 class="fw-bold m-0">Выгрузка отчета</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                 <div class="d-flex gap-2 mb-4"><div class="flex-grow-1"><label class="small text-white-50 fw-bold mb-1 ps-1">С</label><input type="date" id="export-date-from" class="form-control input-dark py-2 text-center fs-6"></div><div class="flex-grow-1"><label class="small text-white-50 fw-bold mb-1 ps-1">ПО</label><input type="date" id="export-date-to" class="form-control input-dark py-2 text-center fs-6"></div></div>
-                
                 <div class="segment-control">
                     <div class="segment-item"><input type="radio" name="btnExportType" id="ex-l1" value="line1_2" class="segment-input" checked><label for="ex-l1" class="segment-label">Линии</label></div>
                     <div class="segment-item"><input type="radio" name="btnExportType" id="ex-st" value="stapel" class="segment-input"><label for="ex-st" class="segment-label">Стапель</label></div>
                     <div class="segment-item"><input type="radio" name="btnExportType" id="ex-all" value="all" class="segment-input"><label for="ex-all" class="segment-label">Все</label></div>
                 </div>
-
                 <div class="d-grid gap-2 mt-4"><button class="btn btn-primary fw-bold py-3 rounded-4" onclick="downloadExcel()"><i class="bi bi-download me-2"></i> Скачать Excel</button></div>
             </div>
         </div>
     </div>
     
-    <!-- ANALYTICS MODAL -->
     <div class="modal fade" id="chartModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content shadow p-4 border-0" style="background:#f8fafc;">
@@ -547,39 +1086,35 @@
                     </ul>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tab-analytics">
                         <div class="d-flex gap-2 mb-3">
                             <button class="btn btn-white border fw-bold" onclick="setAnalyticsDate('today')">Сегодня</button>
                             <button class="btn btn-white border fw-bold" onclick="setAnalyticsDate('yesterday')">Вчера</button>
-                            <input type="date" id="an-date-from" class="form-control" style="width: auto;" onchange="loadAnalytics()">
-                            <input type="date" id="an-date-to" class="form-control" style="width: auto;" onchange="loadAnalytics()">
+                            <input type="date" id="an-date-from" class="form-control" style="min-width: 0;" onchange="loadAnalytics()">
+                            <input type="date" id="an-date-to" class="form-control" style="min-width: 0;" onchange="loadAnalytics()">
                         </div>
                         <div class="row g-3 mb-3">
                             <div class="col-6"><div class="p-3 bg-white rounded-4 shadow-sm"><div class="small text-muted fw-bold">ПРОИЗВЕДЕНО</div><div class="fs-2 fw-bold text-primary" id="an-total">0</div></div></div>
                             <div class="col-6"><div class="p-3 bg-white rounded-4 shadow-sm"><div class="small text-muted fw-bold">СКОРОСТЬ (ср)</div><div class="fs-2 fw-bold text-dark" id="an-speed">0</div></div></div>
                         </div>
-                        <div class="bg-white p-3 rounded-4 shadow-sm" style="height:300px;"><canvas id="prodChart"></canvas></div>
+                        <div class="bg-white p-3 rounded-4 shadow-sm chart-container">
+                            <canvas id="prodChart"></canvas>
+                        </div>
                     </div>
-                    
                     <div class="tab-pane fade" id="tab-forecast">
                         <div class="bg-white p-4 rounded-4 shadow-sm text-center">
-                            
                             <div class="d-flex justify-content-center mb-4">
                                 <div class="btn-group bg-light rounded-pill p-1 border" role="group">
                                     <input type="radio" class="btn-check" name="forecastFilter" id="ff-active" value="active" checked onchange="initForecastTab()">
                                     <label class="btn btn-sm btn-light rounded-pill fw-bold px-3 border-0" for="ff-active">В работе</label>
-                                    
                                     <input type="radio" class="btn-check" name="forecastFilter" id="ff-all" value="all" onchange="initForecastTab()">
                                     <label class="btn btn-sm btn-light rounded-pill fw-bold px-3 border-0" for="ff-all">Все</label>
                                 </div>
                             </div>
-
                             <select id="forecast-order-select" class="form-select modern-input mb-4" onchange="calcForecast()">
                                 <option value="" selected disabled>-- Список заказов --</option>
                             </select>
-                            
                             <div id="forecast-result" class="d-none">
                                 <div class="row g-3">
                                     <div class="col-6"><div class="p-3 bg-light rounded-3"><div class="small text-muted fw-bold text-uppercase" id="fc-label-rem">Осталось</div><div class="fs-2 fw-bold text-primary" id="fc-remaining">0</div><div class="small text-muted">шт</div></div></div>
@@ -596,21 +1131,191 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    window.addEventListener('load', () => {
+        const splash = document.getElementById('splash-screen');
+        if (!sessionStorage.getItem('splash_shown')) {
+            const isMobile = window.innerWidth <= 768;
+            const delay = isMobile ? 500 : 1500;
+
+            setTimeout(() => {
+                document.body.classList.add('app-loaded');
+                setTimeout(() => {
+                    if(splash) splash.remove();
+                }, 500);
+            }, delay);
+            sessionStorage.setItem('splash_shown', 'true');
+        } else {
+            if(splash) splash.remove();
+            document.body.classList.add('app-loaded');
+        }
+    });
+
     const el = (id) => document.getElementById(id);
     function escapeHtml(text) { if (text == null) return ""; return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
     function getLocalDateString(offsetDays=0) { const d = new Date(); d.setDate(d.getDate() + offsetDays); const offset = d.getTimezoneOffset() * 60000; return new Date(d.getTime() - offset).toISOString().split('T')[0]; }
 
+    let currentOrderHistory = []; 
     let selId = localStorage.getItem('sk_id_fin11');
     let selName = localStorage.getItem('sk_name_fin11');
     let userMode = localStorage.getItem('sk_mode') || 'worker';
     
-    let st = { stat: 7, sidebar: 1, table: 1.5, nav: 1.6, vol: 1, header: 1, 'card-title': 1, 'card-meta': 0.85, shift_start: '08:00', shift_end: '20:00', breaks: [] };
+    // ДОБАВЛЕНО: label: 0.85
+    let st = { base: 1, label: 0.85, stat: 7, sidebar: 1, table: 1.5, nav: 1.6, vol: 1, header: 1, 'card-title': 1, 'card-meta': 0.85, shift_start: '08:00', shift_end: '20:00', breaks: [] };
     let myChart = null; let scanTimer; const SCAN_DELAY = 200; let lastOrdersHtml = ""; let isScanning = false; let cachedOrders = []; let cachedHistory = []; 
     let expandedGroups = JSON.parse(localStorage.getItem('sk_expanded_groups') || '["TODAY", "INWORK"]');
     
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = wsProto + '//' + window.location.host + '/ws';
     let socket;
+
+    // --- УМНЫЙ МАСТЕР СОЗДАНИЯ ЗАКАЗА ---
+    let wizState = { step: 0, name: '', target: 0, lineIdx: 0, dups: false };
+    const wizLines = ['conveyor_1', 'conveyor_2', 'stapel'];
+    const wizInput = document.getElementById('wiz-input');
+    const wizSettings = document.getElementById('wiz-settings');
+
+    if (wizInput) {
+        wizInput.addEventListener('keydown', async function(e) {
+            if (e.key === 'Escape') {
+                resetWizard();
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = this.value.trim();
+                if (wizState.step === 0) {
+                    if (!val) return;
+                    wizState.name = val;
+                    wizState.step = 1;
+                    this.value = '';
+                    this.placeholder = 'Введите ПЛАН (шт)';
+                    this.classList.add('step-qty');
+                    return;
+                }
+                if (wizState.step === 1) {
+                    if (!val) return; 
+                    wizState.target = parseInt(val) || 0;
+                    wizState.step = 2;
+                    this.style.display = 'none';
+                    wizSettings.style.display = 'block';
+                    updateWizUI();
+                    wizSettings.setAttribute('tabindex', '0');
+                    wizSettings.focus();
+                    return;
+                }
+            }
+        });
+    }
+
+    if (wizSettings) {
+        wizSettings.addEventListener('keydown', async (e) => {
+            if (e.key === 'Escape') { resetWizard(); return; }
+            if (e.key === 'ArrowRight') {
+                wizState.lineIdx = (wizState.lineIdx + 1) % 3;
+                updateWizUI();
+            } else if (e.key === 'ArrowLeft') {
+                wizState.lineIdx = (wizState.lineIdx - 1 + 3) % 3;
+                updateWizUI();
+            }
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                wizState.dups = !wizState.dups;
+                updateWizUI();
+            }
+            if (e.key === 'Enter') {
+                await finishWizard();
+            }
+        });
+    }
+
+    function updateWizUI() {
+        document.querySelectorAll('.wiz-type').forEach((el, idx) => {
+            if (idx === wizState.lineIdx) el.classList.add('active');
+            else el.classList.remove('active');
+        });
+        const dBox = document.getElementById('wd-box');
+        if (wizState.dups) {
+            dBox.innerText = "Дубликаты: ДА";
+            dBox.classList.add('active');
+        } else {
+            dBox.innerText = "Дубликаты: НЕТ";
+            dBox.classList.remove('active');
+        }
+    }
+
+    async function finishWizard() {
+        try {
+            const res = await fetch('/action/add_order', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: wizState.name,
+                    target: wizState.target,
+                    type: wizLines[wizState.lineIdx],
+                    allow_dups: wizState.dups
+                })
+            });
+            const data = await res.json();
+            
+            if (data.status === 'ok' && data.id) {
+                resetWizard();
+                setTimeout(() => {
+                    selectOrder(data.id, wizState.name); 
+                    switchMobileTab('scan');
+                    closeAllOverlays(); 
+                    setTimeout(() => {
+                        const inp = document.getElementById('serial-input');
+                        if(inp) inp.focus();
+                    }, 300);
+                }, 200);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка создания");
+            resetWizard();
+        }
+    }
+
+    function resetWizard() {
+        wizState = { step: 0, name: '', target: 0, lineIdx: 0, dups: false };
+        wizInput.value = '';
+        wizInput.placeholder = '+ Создать заказ';
+        wizInput.classList.remove('step-qty');
+        wizInput.style.display = 'block';
+        wizSettings.style.display = 'none';
+        wizInput.focus();
+    }
+
+    document.addEventListener('touchmove', e => {
+        const y = e.touches[0].clientY;
+        if (window.scrollY === 0 && y > touchStartY) {
+            ptrDist = y - touchStartY;
+            if (ptrDist < 20) return;
+            const visualDist = Math.min((ptrDist - 20) * 0.4, 90); 
+            ptrElement.style.opacity = Math.min(visualDist / 50, 1);
+            ptrElement.style.transform = `translateY(${visualDist}px)`;
+            ptrIcon.style.transform = `rotate(${ptrDist}deg)`;
+            if (ptrDist > ptrThreshold) {
+                document.body.classList.add('ptr-active');
+            } else {
+                document.body.classList.remove('ptr-active');
+            }
+        }
+    }, {passive: true});
+
+    document.addEventListener('touchend', e => {
+        ptrElement.style.transition = 'transform 0.3s, opacity 0.3s';
+        if (document.body.classList.contains('ptr-active') && ptrDist > ptrThreshold) {
+            location.reload();
+        } else {
+            ptrElement.style.opacity = '0';
+            ptrElement.style.transform = 'translateY(-20px)';
+            document.body.classList.remove('ptr-active');
+        }
+        setTimeout(() => {
+            ptrElement.style.transition = '';
+            ptrDist = 0;
+        }, 300);
+    });
 
     function connectWS() {
         socket = new WebSocket(wsUrl);
@@ -624,43 +1329,35 @@
                 cachedHistory = d.history || []; 
                 updateGlobalStats(d.stats, d.online_count); 
                 if (document.getElementById('order-search').value.length < 3) renderSidebar(d.orders); 
-                renderHistoryTable();
+                if (!selId) renderHistoryTable(cachedHistory);
             } else if (msg.type === 'scan_event') {
                 const d = msg.data;
                 if (!d) return; 
                 if(d.stats) updateGlobalStats(d.stats, null); 
-                
-                const order = cachedOrders.find(o => o.id == d.order_id); 
-                if (order) { 
-                    order.local_scanned = d.order_total; 
-                    order.global_scanned = d.order_total; 
-                    const txtEl = document.getElementById(`ord-txt-${d.order_id}`); 
-                    const progEl = document.getElementById(`ord-prog-${d.order_id}`); 
-                    const targetDisplay = order.target_qty > 0 ? order.target_qty : '∞'; 
-                    if(txtEl) txtEl.innerText = `${d.order_total} / ${targetDisplay}`; 
-                    if(progEl) { let pct = order.target_qty > 0 ? Math.min(100, (d.order_total / order.target_qty) * 100) : 0; progEl.style.width = pct + '%'; } 
-                    if(order.target_qty > 0 && d.order_total >= order.target_qty) { 
-                        const card = document.getElementById(`ord-card-${d.order_id}`); 
-                        if(card) { card.classList.remove('status-work'); card.classList.add('status-done'); } 
-                    } 
-                } 
-                if (selId == d.order_id) { document.getElementById('stat-total').innerText = d.order_total; } 
+                cachedOrders.forEach(order => {
+                    if (order.name === d.order_name) {
+                        order.local_scanned = d.order_total;
+                        const elText = document.getElementById('ord-txt-' + order.id);
+                        const elBar = document.getElementById('ord-prog-' + order.id);
+                        const elCard = document.getElementById('ord-card-' + order.id);
+                        const target = order.target_qty || 1; 
+                        if (elText) { elText.innerText = d.order_total + ' / ' + order.target_qty; elText.style.color = '#fff'; setTimeout(() => elText.style.color = '', 300); }
+                        if (elBar) { const pct = Math.min(100, (d.order_total / target) * 100); elBar.style.width = pct + '%'; }
+                        if (elCard && d.order_total >= target) { elCard.classList.remove('status-work'); elCard.classList.add('status-done'); }
+                    }
+                });
                 if (d.scan_entry) { 
-                    const rowHtml = createHistoryRow(d.scan_entry, true); 
-                    const tbody = document.getElementById('history-table'); 
-                    if(tbody) { 
-                        if (!selId || selId == d.order_id) { 
-                            tbody.insertAdjacentHTML('afterbegin', rowHtml); 
-                            if (tbody.children.length > 50) tbody.removeChild(tbody.lastElementChild); 
-                        } 
-                    } 
-                }
-                
-                // AUTO UPDATE FORECAST
-                const forecastModal = document.getElementById('chartModal');
-                if (forecastModal && forecastModal.classList.contains('show')) {
-                     const selectedOid = document.getElementById('forecast-order-select').value;
-                     if (selectedOid == d.order_id) calcForecast(); 
+                    cachedHistory.unshift(d.scan_entry);
+                    if (cachedHistory.length > 50) cachedHistory.pop();
+                    if (selId) {
+                        const currentOrder = cachedOrders.find(o => o.id == selId);
+                        if (currentOrder && currentOrder.name === d.order_name) {
+                            currentOrderHistory.unshift(d.scan_entry);
+                            renderHistoryTable(currentOrderHistory);
+                        }
+                    } else {
+                        renderHistoryTable(cachedHistory);
+                    }
                 }
             }
         };
@@ -673,12 +1370,23 @@
 
     document.addEventListener("DOMContentLoaded", () => {
         connectWS();
-        
         document.getElementById('export-date-from').value = getLocalDateString();
         document.getElementById('export-date-to').value = getLocalDateString();
         document.getElementById('an-date-from').value = getLocalDateString();
         document.getElementById('an-date-to').value = getLocalDateString();
         
+        const savedPrefs = JSON.parse(localStorage.getItem('sk_ui_prefs') || '{}');
+        if(savedPrefs.base) st.base = savedPrefs.base;
+        // ЗАГРУЗКА label
+        if(savedPrefs.label) st.label = savedPrefs.label;
+        if(savedPrefs.stat) st.stat = savedPrefs.stat;
+        if(savedPrefs.sidebar) st.sidebar = savedPrefs.sidebar;
+        if(savedPrefs.table) st.table = savedPrefs.table;
+        if(savedPrefs.nav) st.nav = savedPrefs.nav;
+        if(savedPrefs.vol !== undefined) st.vol = savedPrefs.vol;
+
+        applySettings();
+
         fetch('/action/get_settings').then(r=>r.json()).then(d => {
             if(d.shift_start) st.shift_start = d.shift_start;
             if(d.shift_end) st.shift_end = d.shift_end;
@@ -687,73 +1395,176 @@
         });
 
         applyMode(userMode); updateUI(); 
-        new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 120, height: 120 });
+new QRCode(document.getElementById("qrcode"), { text: "{{ server_url }}", width: 120, height: 120 });
         const ipEls = document.querySelectorAll('.ip-display');
         ipEls.forEach(el => el.innerText = "IP: " + window.location.hostname);
 
         const inp = document.getElementById('serial-input');
-        
-        document.body.addEventListener('click', (e) => { if(selId && !e.target.closest('input, button, .modal, .sidebar') && !isMobile()) { inp.focus(); } });
-        
-        inp.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                clearTimeout(scanTimer);
-                submitScan();
+        document.body.addEventListener('click', (e) => {
+            if (selId && !e.target.closest('button, input, select, .modal, .sidebar, .nav-item-mobile')) {
+                inp.focus();
             }
         });
-
-        inp.addEventListener('input', () => { 
-            clearTimeout(scanTimer); 
-            document.body.classList.remove('bg-error-persistent'); 
-            document.getElementById('scan-msg').innerHTML = ''; 
-            if (inp.value.trim().length > 0) scanTimer = setTimeout(submitScan, SCAN_DELAY); 
-        });
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(scanTimer); submitScan(); } });
+        inp.addEventListener('input', () => { clearTimeout(scanTimer); document.body.classList.remove('bg-error-persistent'); document.getElementById('scan-msg').innerHTML = ''; if (inp.value.trim().length > 0) scanTimer = setTimeout(submitScan, SCAN_DELAY); });
+        
+        if(selId) selectOrder(selId, selName);
+        
+        // ВЫЗОВ ФУНКЦИЙ РЕСАЙЗА
+        restoreLayoutSizes();
+        initResizers();
     });
 
+    // ==========================================
+    // НОВЫЙ БЛОК: OFFLINE РЕЖИМ (ВСТАВИТЬ СЮДА)
+    // ==========================================
+
+    // 1. Очередь загружаем из памяти (если была)
+    let offlineQueue = JSON.parse(localStorage.getItem('sk_offline_queue') || '[]');
+    let isSyncing = false;
+
+    // 2. Обновляем иконку Wi-Fi в шапке
+    function updateOfflineUI() {
+        const ind = document.getElementById('offline-indicator');
+        const cnt = document.getElementById('offline-count');
+        
+        // Если элемент индикатора еще не добавили в HTML, просто выходим, чтобы не было ошибки
+        if (!ind || !cnt) return; 
+
+        if (offlineQueue.length > 0) {
+            ind.classList.remove('d-none');
+            ind.classList.add('d-flex');
+            cnt.innerText = offlineQueue.length;
+            const inp = document.getElementById('serial-input');
+            if(inp) inp.style.borderColor = '#f59e0b'; // Желтая рамка
+        } else {
+            ind.classList.add('d-none');
+            ind.classList.remove('d-flex');
+            const inp = document.getElementById('serial-input');
+            if(inp) inp.style.borderColor = '#cbd5e1'; // Обычная рамка
+        }
+    }
+
+    // 3. НОВАЯ ФУНКЦИЯ ОТПРАВКИ СКАНА
     async function submitScan() { 
         const inp = document.getElementById('serial-input'); 
         const val = inp.value.trim(); 
-        if(!val || !selId) return; 
-        inp.value = ''; 
         
+        // Если ничего не ввели или заказ не выбран - уходим
+        if(!val || !selId) return; 
+        
+        inp.value = ''; // Очищаем поле сразу
+        
+        // Получаем текущее время клиента (чтобы в базе было время скана, а не время появления сети)
+        const now = new Date();
+        // Корректировка часового пояса для правильного формата ISO
+        const offsetMs = now.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(now - offsetMs)).toISOString().slice(0, 19).replace('T', ' ');
+
+        const payload = {
+            serial: val, 
+            order_id: parseInt(selId),
+            timestamp: localISOTime 
+        };
+
         try { 
+            // Пытаемся отправить
             const res = await fetch('/action/scan', { 
                 method: 'POST', 
                 headers:{'Content-Type':'application/json'}, 
-                body: JSON.stringify({serial: val, order_id: parseInt(selId)}) 
+                body: JSON.stringify(payload) 
             }); 
+            
+            // Если сервер вернул ошибку сети или 500-е ошибки
+            if (!res.ok && res.status !== 400 && res.status !== 200) {
+                throw new Error("Network/Server error");
+            }
             
             const d = await res.json(); 
             
             if(d.status === 'success') { 
+                // УСПЕХ ОНЛАЙН
                 sndOk.currentTime=0; 
                 sndOk.play().catch(()=>{}); 
                 document.getElementById('scan-msg').innerHTML = ''; 
-            } else { 
+                
+                // Если вдруг были старые ошибки сети, убираем красный фон
+                document.body.classList.remove('bg-error-persistent');
+            } 
+            else { 
+                // СЕРВЕР ОТВЕТИЛ, НО ЭТО ОШИБКА ЛОГИКИ (например, Дубликат)
+                // Это НЕ проблема сети, в очередь не кладем
                 sndErr.currentTime=0; 
                 sndErr.play().catch(()=>{}); 
                 document.body.classList.add('bg-error-persistent'); 
                 document.getElementById('scan-msg').innerHTML = `<span class="text-white">${d.msg || 'ОШИБКА'}</span>`; 
             } 
-        } catch(e) {
-            console.error(e);
+
+        } catch(e) { 
+            // === СЮДА ПОПАДАЕМ ПРИ ОБРЫВЕ КАБЕЛЯ ИЛИ WIFI ===
+            console.log("Offline mode activated. Scan saved locally.");
+            
+            offlineQueue.push(payload);
+            localStorage.setItem('sk_offline_queue', JSON.stringify(offlineQueue));
+            
+            // Для рабочего это выглядит как УСПЕХ
+            sndOk.currentTime=0; 
+            sndOk.play().catch(()=>{}); 
+            document.getElementById('scan-msg').innerHTML = '<span style="color: #f59e0b;">СОХРАНЕНО (OFFLINE)</span>';
+            document.body.classList.remove('bg-error-persistent'); // Убираем красный фон, если был
+
+            // Обновляем визуальный счетчик "на лету", чтобы рабочий видел прогресс
+            const elText = document.getElementById('ord-txt-' + selId);
+            if(elText) {
+                let parts = elText.innerText.split('/');
+                if(parts.length > 0) {
+                    let cur = parseInt(parts[0].trim()) || 0;
+                    // Просто прибавляем +1 на экране
+                    elText.innerText = (cur + 1) + (parts[1] ? ' / ' + parts[1] : '');
+                    elText.style.color = '#f59e0b'; // Красим цифры в желтый
+                }
+            }
+            updateOfflineUI();
         } 
         
         if (!isMobile()) inp.focus(); 
     }
 
+    // 4. ФОНОВЫЙ РОБОТ (СИНХРОНИЗАТОР)
+    // Запускается каждые 3 секунды и проверяет, есть ли интернет
+    setInterval(async () => {
+        if (offlineQueue.length === 0 || isSyncing) return;
+        
+        isSyncing = true;
+        const item = offlineQueue[0]; // Берем первый скан из очереди
+        
+        try {
+            const res = await fetch('/action/scan', { 
+                method: 'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body: JSON.stringify(item) 
+            });
+            
+            // Если запрос прошел (даже если сервер ответил "Дубликат" - главное связь есть)
+            if(res.ok || res.status === 400 || res.status === 200) {
+                 offlineQueue.shift(); // Удаляем этот скан из очереди
+                 localStorage.setItem('sk_offline_queue', JSON.stringify(offlineQueue));
+                 updateOfflineUI();
+            }
+        } catch (e) {
+            // Интернет всё еще не появился... ждем следующего цикла
+        } finally {
+            isSyncing = false;
+        }
+    }, 3000); 
+
+    // Запускаем проверку интерфейса при старте
+    window.addEventListener('load', updateOfflineUI);
+
     function updateGlobalStats(stats, online) { 
-        if (!selId) { 
-            document.getElementById('stat-total').innerText = stats.total ?? 0; 
-            document.getElementById('stat-total-label').innerText = "Всего сегодня"; 
-        } else { 
-            const o = cachedOrders.find(x => x.id == selId); 
-            if(o) { 
-                document.getElementById('stat-total').innerText = o.local_scanned; 
-                document.getElementById('stat-total-label').innerText = o.name; 
-            } 
-        } 
+        document.getElementById('stat-total').innerText = stats.total ?? 0; 
+        document.getElementById('stat-total-label').innerText = "Всего сегодня"; 
+        
         document.getElementById('stat-c1').innerText = stats.c1 ?? 0; 
         document.getElementById('stat-c2').innerText = stats.c2 ?? 0; 
         document.getElementById('stat-stapel').innerText = stats.stapel ?? 0; 
@@ -761,36 +1572,259 @@
     }
 
     function addBreakRow(start="", end="") {
-        const div = document.createElement('div');
-        div.className = "d-flex gap-2 mb-2 break-row";
-        div.innerHTML = `<input type="time" class="form-control modern-input text-center" value="${start}"><span class="align-self-center">-</span><input type="time" class="form-control modern-input text-center" value="${end}"><button class="btn btn-light text-danger" onclick="this.parentElement.remove()"><i class="bi bi-trash"></i></button>`;
+        const div = document.createElement('div'); div.className = "d-flex gap-2 mb-2 break-row";
+        div.innerHTML = `<input type="time" class="form-control modern-input text-center" onchange="autoSaveSettings()" value="${start}"><span class="align-self-center">-</span><input type="time" class="form-control modern-input text-center" onchange="autoSaveSettings()" value="${end}"><button class="btn btn-light text-danger" onclick="this.parentElement.remove(); autoSaveSettings();"><i class="bi bi-trash"></i></button>`;
         document.getElementById('breaks-container').appendChild(div);
     }
+
     function applySettings() {
-        document.documentElement.style.setProperty('--fs-stat', st.stat + 'rem'); document.documentElement.style.setProperty('--fs-sidebar', st.sidebar + 'rem'); document.documentElement.style.setProperty('--fs-table', st.table + 'rem'); document.documentElement.style.setProperty('--fs-nav-icon', st.nav + 'rem');
+        document.documentElement.style.setProperty('--fs-base', st.base + 'rem');
+        document.getElementById('rng-base').value = st.base;
+        
+        // НОВОЕ: Применяем шрифт заголовков
+        document.documentElement.style.setProperty('--fs-label', st.label + 'rem');
+        const rngLabel = document.getElementById('rng-label');
+        if(rngLabel) rngLabel.value = st.label;
+
+        document.documentElement.style.setProperty('--fs-stat', st.stat + 'rem'); 
+        const sbInner = document.querySelector('.sidebar-inner'); if(sbInner) sbInner.style.fontSize = st.sidebar + 'rem';
+        document.documentElement.style.setProperty('--fs-table', st.table + 'rem'); document.documentElement.style.setProperty('--fs-nav-icon', st.nav + 'rem');
         if(st.header) document.documentElement.style.setProperty('--fs-header', st.header + 'rem');
         document.getElementById('rng-stat').value = st.stat; document.getElementById('rng-sidebar').value = st.sidebar; document.getElementById('rng-table').value = st.table; if(document.getElementById('rng-nav')) document.getElementById('rng-nav').value = st.nav; document.getElementById('volRange').value = st.vol;
         document.getElementById('set-shift-start').value = st.shift_start || "08:00"; document.getElementById('set-shift-end').value = st.shift_end || "20:00";
-        document.getElementById('breaks-container').innerHTML = '';
-        (st.breaks || []).forEach(b => addBreakRow(b.start, b.end));
+        
+        const container = document.getElementById('breaks-container');
+        if(container.children.length === 0 && st.breaks.length > 0) {
+            container.innerHTML = ''; (st.breaks || []).forEach(b => addBreakRow(b.start, b.end));
+        }
         sndOk.volume = st.vol; sndErr.volume = st.vol;
+        if(document.getElementById('rng-nav')) document.documentElement.style.setProperty('--fs-nav-icon', st.nav + 'rem');
     }
-    function saveAndCloseSettings() {
-        st.shift_start = document.getElementById('set-shift-start').value;
-        st.shift_end = document.getElementById('set-shift-end').value;
-        st.breaks = [];
-        document.querySelectorAll('.break-row').forEach(row => {
-            const inputs = row.querySelectorAll('input');
-            if(inputs[0].value && inputs[1].value) st.breaks.push({start: inputs[0].value, end: inputs[1].value});
-        });
-        fetch('/action/save_settings', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({shift_start: st.shift_start, shift_end: st.shift_end, breaks: st.breaks}) });
-        bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
-    }
-    function setFont(key, val) { st[key] = val; document.documentElement.style.setProperty(`--fs-${key}`, val + 'rem'); }
-    function setNavSize(val) { st.nav = val; document.documentElement.style.setProperty('--fs-nav-icon', val + 'rem'); }
-    function updateVolume(val) { st.vol = val; sndOk.volume = val; sndErr.volume = val; }
 
-    function openChartModal() { new bootstrap.Modal(document.getElementById('chartModal')).show(); loadAnalytics(); }
+    function autoSaveSettings() {
+        st.shift_start = document.getElementById('set-shift-start').value; 
+        st.shift_end = document.getElementById('set-shift-end').value; 
+        st.breaks = [];
+        document.querySelectorAll('.break-row').forEach(row => { 
+            const inputs = row.querySelectorAll('input'); 
+            if(inputs[0].value && inputs[1].value) st.breaks.push({start: inputs[0].value, end: inputs[1].value}); 
+        });
+        
+        st.base = parseFloat(document.getElementById('rng-base').value);
+        // НОВОЕ: Сохраняем label
+        st.label = parseFloat(document.getElementById('rng-label').value);
+        st.stat = parseFloat(document.getElementById('rng-stat').value); 
+        st.sidebar = parseFloat(document.getElementById('rng-sidebar').value); 
+        st.table = parseFloat(document.getElementById('rng-table').value); 
+        st.nav = parseFloat(document.getElementById('rng-nav').value); 
+        st.vol = parseFloat(document.getElementById('volRange').value);
+        
+        applySettings();
+        
+        localStorage.setItem('sk_ui_prefs', JSON.stringify({
+            base: st.base, 
+            label: st.label, // Добавили сохранение
+            stat: st.stat, sidebar: st.sidebar, table: st.table, nav: st.nav, vol: st.vol
+        }));
+
+        fetch('/action/save_settings', { 
+            method:'POST', 
+            headers:{'Content-Type':'application/json'}, 
+            body:JSON.stringify({shift_start: st.shift_start, shift_end: st.shift_end, breaks: st.breaks}) 
+        });
+    }
+
+    function setFont(key, val) { 
+        if(key === 'sidebar') { 
+            const sbInner = document.querySelector('.sidebar-inner'); 
+            if(sbInner) sbInner.style.fontSize = val + 'rem'; 
+        } else { 
+            document.documentElement.style.setProperty(`--fs-${key}`, val + 'rem'); 
+        } 
+    }
+    function setNavSize(val) { document.documentElement.style.setProperty('--fs-nav-icon', val + 'rem'); }
+    function updateVolume(val) { sndOk.volume = val; sndErr.volume = val; }
+
+    function closeAllOverlays() {
+        document.getElementById('sidebar').classList.remove('active');
+        document.getElementById('overlay').classList.remove('active');
+        const modals = document.querySelectorAll('.modal.show');
+        modals.forEach(m => { const instance = bootstrap.Modal.getInstance(m); if(instance) instance.hide(); });
+    }
+    function closeAllMenus() { 
+        switchMobileTab('scan'); 
+    }
+
+    function highlightNav(targetName) {
+        document.querySelectorAll('.nav-item-mobile').forEach(btn => btn.classList.remove('active'));
+        const icons = { 
+            'stat': 'bi-bar-chart-fill', 
+            'scan': 'bi-upc-scan', 
+            'menu': 'bi-list-task', 
+            'settings': 'bi-gear-fill' 
+        };
+        if (icons[targetName]) { 
+            const iconClass = icons[targetName];
+            const iconEl = document.querySelector(`.bottom-nav i.${iconClass}`);
+            if (iconEl) {
+                const btn = iconEl.closest('.nav-item-mobile');
+                if (btn) btn.classList.add('active');
+            }
+        }
+    }
+
+
+    function highlightNav(targetName) {
+        document.querySelectorAll('.nav-item-mobile').forEach(btn => btn.classList.remove('active'));
+        const icons = { 
+            'stat': 'bi-bar-chart-fill', 
+            'scan': 'bi-house-door-fill', // Обновили иконку на Дом
+            'menu': 'bi-list-task', 
+            'settings': 'bi-gear-fill',
+            'salary': 'bi-wallet2'        // Новая иконка
+        };
+        
+        if (icons[targetName]) { 
+            const iconClass = icons[targetName];
+            const iconEl = document.querySelector(`.bottom-nav i.${iconClass}`);
+            if (iconEl) {
+                const btn = iconEl.closest('.nav-item-mobile');
+                if (btn) btn.classList.add('active');
+            }
+        }
+    }
+
+    let activeMobileTab = 'scan'; 
+
+    function switchMobileTab(tabName) {
+        // 1. Toggle (возврат на главную при повторном клике)
+        if (tabName === activeMobileTab && tabName !== 'scan') {
+            switchMobileTab('scan');
+            return;
+        }
+
+        activeMobileTab = tabName;
+
+        // 2. Закрытие сайдбара (для мобильных)
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('active');
+
+        // 3. Закрытие всех модалок
+        document.querySelectorAll('.modal.show').forEach(el => {
+            const instance = bootstrap.Modal.getInstance(el);
+            if (instance) instance.hide();
+        });
+
+        // 4. Логика открытия
+        if (tabName === 'scan') {
+            setTimeout(() => { 
+                const inp = document.getElementById('serial-input'); 
+                if(inp && !inp.disabled && window.innerWidth <= 768) inp.focus(); 
+            }, 100);
+        } 
+        else if (tabName === 'menu') {
+            if (sidebar) sidebar.classList.add('active'); 
+        }
+        else {
+            let modalId = '';
+            
+            if (tabName === 'stat') {
+                loadAnalytics();
+                modalId = 'chartModal';
+            } 
+            else if (tabName === 'settings') {
+                modalId = 'settingsModal';
+            }
+            else if (tabName === 'salary') {
+                modalId = 'salaryModal';
+                
+                // === ЛОГИКА ПАМЯТИ ПАРОЛЯ ===
+                if (localStorage.getItem('sk_salary_unlocked') === 'true') {
+                    showSalaryContent(); // Открыть сразу, если пароль уже вводили
+                } else {
+                    lockSalary(); // Требовать пароль
+                }
+            }
+
+            const modalEl = document.getElementById(modalId);
+            if (modalEl) {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            }
+        }
+
+        highlightNav(tabName);
+    }
+
+    // --- ЛОГИКА ПАРОЛЯ ---
+    function checkSalaryPass() {
+        const inp = document.getElementById('salary-pass-input');
+        const err = document.getElementById('salary-error');
+        
+        if (inp.value === '0011') {
+            // УСПЕХ: Сохраняем доступ в память
+            localStorage.setItem('sk_salary_unlocked', 'true');
+            
+            // Показываем контент
+            showSalaryContent();
+            
+            err.style.opacity = '0';
+            inp.value = ''; 
+        } else {
+            // ОШИБКА
+            err.style.opacity = '1';
+            inp.classList.add('bg-danger', 'bg-opacity-10', 'text-danger');
+            setTimeout(() => inp.classList.remove('bg-danger', 'bg-opacity-10', 'text-danger'), 500);
+        }
+    }
+    // Вспомогательная функция для переключения UI на "Открыто"
+    function showSalaryContent() {
+        document.getElementById('salary-lock-screen').classList.add('d-none');
+        document.getElementById('salary-content').classList.remove('d-none');
+    }
+    
+     // Функция БЛОКИРОВКИ (Сброс доступа)
+    function lockSalary() {
+        // Удаляем доступ из памяти
+        localStorage.removeItem('sk_salary_unlocked');
+        
+        // Возвращаем экран пароля
+        document.getElementById('salary-lock-screen').classList.remove('d-none');
+        document.getElementById('salary-content').classList.add('d-none');
+        
+        const inp = document.getElementById('salary-pass-input');
+        if(inp) inp.value = '';
+        
+        const err = document.getElementById('salary-error');
+        if(err) err.style.opacity = '0';
+    }
+
+    // Поддержка нажатия Enter в поле пароля
+    document.getElementById('salary-pass-input')?.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') checkSalaryPass();
+    });
+    
+    // Вспомогательная функция для закрытия всего (называется так же, как в вашем коде)
+    function closeAllMenus() { 
+        switchMobileTab('scan'); 
+    }
+       
+    function openSettings() {
+        const el = document.getElementById('settingsModal');
+        const wasOpen = el.classList.contains('show');
+        switchMobileTab('home');
+        if (!wasOpen) { const modal = new bootstrap.Modal(el); modal.show(); highlightNav('settings'); el.addEventListener('hidden.bs.modal', function () { if (!document.querySelector('.nav-item-mobile.active')) { highlightNav('scan'); } }, { once: true }); }
+    }
+
+    function openChartModal() {
+        const el = document.getElementById('chartModal');
+        const wasOpen = el.classList.contains('show');
+        switchMobileTab('home');
+        if (!wasOpen) { loadAnalytics(); const modal = new bootstrap.Modal(el); modal.show(); highlightNav('stat'); el.addEventListener('hidden.bs.modal', function () { if (!document.querySelector('.nav-item-mobile.active')) { highlightNav('scan'); } }, { once: true }); }
+    }
+    
+    function closeSidebar() { closeAllOverlays(); }
+
     function setAnalyticsDate(type) {
         if(type==='today') { document.getElementById('an-date-from').value = getLocalDateString(); document.getElementById('an-date-to').value = getLocalDateString(); }
         else if(type==='yesterday') { document.getElementById('an-date-from').value = getLocalDateString(-1); document.getElementById('an-date-to').value = getLocalDateString(-1); }
@@ -805,88 +1839,32 @@
         document.getElementById('an-speed').innerText = data.speed;
         if (myChart) { myChart.destroy(); myChart = null; }
         const ctx = document.getElementById('prodChart').getContext('2d');
-        myChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: data.chart_labels,
-                datasets: [{
-                    label: data.chart_type === 'hour' ? 'Шт/час' : 'Шт/день',
-                    data: data.chart_values,
-                    backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                    borderRadius: 4
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+        myChart = new Chart(ctx, { type: 'bar', data: { labels: data.chart_labels, datasets: [{ label: data.chart_type === 'hour' ? 'Шт/час' : 'Шт/день', data: data.chart_values, backgroundColor: 'rgba(59, 130, 246, 0.6)', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false } });
     }
 
     function initForecastTab() {
         const filterEl = document.querySelector('input[name="forecastFilter"]:checked');
         const filter = filterEl ? filterEl.value : 'active';
-        
         const sel = document.getElementById('forecast-order-select');
         sel.innerHTML = '<option value="" selected disabled>-- Выберите заказ --</option>';
-        
         let list = [];
-        if (filter === 'active') {
-            list = cachedOrders.filter(o => o.target_qty > 0 && o.global_scanned < o.global_target);
-        } else {
-            list = cachedOrders.filter(o => o.target_qty > 0);
-        }
-        
+        if (filter === 'active') { list = cachedOrders.filter(o => o.target_qty > 0 && o.global_scanned < o.global_target); } 
+        else { list = cachedOrders.filter(o => o.target_qty > 0); }
         list.sort((a,b) => b.id - a.id);
-
-        list.forEach(o => {
-            const opt = document.createElement('option');
-            opt.value = o.id;
-            let label = o.name;
-            if (o.global_scanned >= o.target_qty) label += " (Готов)";
-            opt.innerText = label;
-            
-            if(selId == o.id) opt.selected = true;
-            sel.appendChild(opt);
-        });
-        
-        if(sel.value) calcForecast();
-        else document.getElementById('forecast-result').classList.add('d-none');
+        list.forEach(o => { const opt = document.createElement('option'); opt.value = o.id; let label = o.name; if (o.global_scanned >= o.target_qty) label += " (Готов)"; opt.innerText = label; if(selId == o.id) opt.selected = true; sel.appendChild(opt); });
+        if(sel.value) calcForecast(); else document.getElementById('forecast-result').classList.add('d-none');
     }
 
     async function calcForecast() {
-        const oid = document.getElementById('forecast-order-select').value;
-        if(!oid) return;
-        
+        const oid = document.getElementById('forecast-order-select').value; if(!oid) return;
         const order = cachedOrders.find(o => o.id == oid);
         const isDone = order && order.global_scanned >= order.target_qty;
-
         const res = await fetch(`/api/forecast_order?order_id=${oid}`);
         const data = await res.json();
-        
-        const elRes = document.getElementById('forecast-result');
-        elRes.classList.remove('d-none');
-
-        const labelDate = document.getElementById('fc-label-date');
-        const valDate = document.getElementById('fc-date');
-        const valDelta = document.getElementById('fc-delta');
-
-        if (isDone) {
-            document.getElementById('fc-remaining').innerText = "0";
-            document.getElementById('fc-speed').innerText = data.speed;
-            
-            labelDate.innerText = "Статус";
-            valDate.innerText = "ВЫПОЛНЕН";
-            valDate.className = "fs-1 fw-bold text-primary lh-1 mb-2";
-            valDelta.innerText = "План закрыт";
-            valDelta.className = "badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fs-6";
-        } else {
-            document.getElementById('fc-remaining').innerText = data.remaining;
-            document.getElementById('fc-speed').innerText = data.speed;
-            
-            labelDate.innerText = "Расчетное завершение";
-            valDate.innerText = data.completion_date;
-            valDate.className = "fs-1 fw-bold text-success lh-1 mb-2";
-            valDelta.innerText = data.human_delta;
-            valDelta.className = "badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fs-6";
-        }
+        const elRes = document.getElementById('forecast-result'); elRes.classList.remove('d-none');
+        const labelDate = document.getElementById('fc-label-date'); const valDate = document.getElementById('fc-date'); const valDelta = document.getElementById('fc-delta');
+        if (isDone) { document.getElementById('fc-remaining').innerText = "0"; document.getElementById('fc-speed').innerText = data.speed; labelDate.innerText = "Статус"; valDate.innerText = "ВЫПОЛНЕН"; valDate.className = "fs-1 fw-bold text-primary lh-1 mb-2"; valDelta.innerText = "План закрыт"; valDelta.className = "badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fs-6"; } 
+        else { document.getElementById('fc-remaining').innerText = data.remaining; document.getElementById('fc-speed').innerText = data.speed; labelDate.innerText = "Расчетное завершение"; valDate.innerText = data.completion_date; valDate.className = "fs-1 fw-bold text-success lh-1 mb-2"; valDelta.innerText = data.human_delta; valDelta.className = "badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fs-6"; }
     }
 
     function filterOrders() { const val = document.getElementById('order-search').value.trim(); const matches = cachedOrders.filter(o => o.name && o.name.toLowerCase().includes(val.toLowerCase())); renderSidebar(matches); }
@@ -912,67 +1890,346 @@
         Object.keys(monthGroups).forEach(key => buildGroup(key, monthGroups[key], key));
         if (html !== lastOrdersHtml) { document.getElementById('orders-container').innerHTML = html; lastOrdersHtml = html; }
     }
+    
     function renderOrderCard(o) {
         const act = o.id == selId ? 'active' : '';
         let pct = o.global_target > 0 ? Math.min(100, (o.global_scanned / o.global_target) * 100) : 0;
         let targetDisplay = o.target_qty > 0 ? o.target_qty : '∞';
         let wmText = o.type === 'conveyor_1' ? "Л1" : (o.type === 'conveyor_2' ? "Л2" : "СТ");
-        return `<div id="ord-card-${o.id}" class="order-card ${act} ${o.target_qty > 0 && o.global_scanned >= o.target_qty ? 'status-done' : 'status-work'}" onclick="selectOrder(${o.id}, '${escapeHtml(o.name)}')" ondblclick="openEditOrderModal(${o.id}, '${escapeHtml(o.name)}', ${o.target_qty}, ${o.global_scanned})">
+        return `<div id="ord-card-${o.id}" class="order-card ${act} ${o.target_qty > 0 && o.global_scanned >= o.target_qty ? 'status-done' : 'status-work'}" onclick="selectOrder(${o.id}, '${escapeHtml(o.name)}')" ondblclick="openEditOrderModal(${o.id}, '${escapeHtml(o.name)}', ${o.target_qty}, ${o.global_scanned}, ${o.allow_dups})">
             <div id="ord-prog-${o.id}" class="order-progress-bg" style="width: ${pct}%"></div><div class="watermark-loc">${wmText}</div>
             <div class="order-content-wrap"><div class="order-top-row"><div class="order-title">${escapeHtml(o.name)}</div></div><div class="order-meta"><span id="ord-txt-${o.id}">${o.global_scanned} / ${targetDisplay}</span></div></div>
-            <div class="order-controls"><button class="btn-mini" onclick="openEditOrderModal(${o.id}, '${escapeHtml(o.name)}', ${o.target_qty}, ${o.global_scanned}, event)"><i class="bi bi-pencil-fill"></i></button><button class="btn-mini del" onclick="deleteOrderDirectly(${o.id}, event)"><i class="bi bi-trash-fill"></i></button></div></div>`;
+            <div class="order-controls"><button class="btn-mini" onclick="openEditOrderModal(${o.id}, '${escapeHtml(o.name)}', ${o.target_qty}, ${o.global_scanned}, ${o.allow_dups}, event)""><i class="bi bi-pencil-fill"></i></button><button class="btn-mini del" onclick="deleteOrderDirectly(${o.id}, event)"><i class="bi bi-trash-fill"></i></button></div></div>`;
     }
-    function createHistoryRow(h, isNew=false) { return `<tr class="${isNew?'new-row':''}"><td class="text-blue fw-bold small text-uppercase">${escapeHtml(h.order_name)}</td><td class="fw-bold">${escapeHtml(h.serial)}</td><td class="text-muted small">${escapeHtml(h.timestamp.split(' ')[1]||h.timestamp)}</td><td class="text-end"><button class="btn-del-row" onclick="deleteScan(${h.id}, event)"><i class="bi bi-x-lg"></i></button></td></tr>`; }
+    
+    function createHistoryRow(h, isNew=false) {
+        let timeStr = h.timestamp.split(' ')[1] || h.timestamp;
+        let timeParts = timeStr.split(':');
+        if(timeParts.length === 3) timeStr = `${timeParts[0]}:${timeParts[1]}`;
+        return `
+        <tr class="${isNew ? 'new-row' : ''}">
+            <td style="width: 65%;">
+                <div class="d-flex flex-column align-items-start">
+                    <span class="h-tag">${escapeHtml(h.order_name)}</span>
+                    <span class="h-sn">${escapeHtml(h.serial)}</span>
+                </div>
+            </td>
+            <td style="width: 35%;" class="text-end">
+                <div class="d-flex align-items-center justify-content-end gap-2">
+                    <span class="h-time">${timeStr}</span>
+                    <button class="btn-nice-del" onclick="deleteScan(${h.id}, event)">
+                        <i class="bi bi-trash3-fill"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }
     function toggleGroup(key) { const el = document.getElementById('group-' + key); if(el) el.classList.toggle('open'); const idx = expandedGroups.indexOf(key); if (el && el.classList.contains('open')) { if(idx === -1) expandedGroups.push(key); } else { if(idx !== -1) expandedGroups.splice(idx, 1); } localStorage.setItem('sk_expanded_groups', JSON.stringify(expandedGroups)); }
-    function toggleSidebar() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('overlay'); if (isMobile()) { sb.classList.toggle('active'); ov.classList.toggle('active'); } else { sb.classList.toggle('collapsed'); } }
+    function toggleSidebar() { const sb = document.getElementById('sidebar'); const wasActive = sb.classList.contains('active'); switchMobileTab('home'); if (!wasActive) { sb.classList.add('active'); document.getElementById('overlay').classList.add('active'); highlightNav('menu'); } }
     function toggleMode() { userMode = userMode === 'worker' ? 'itr' : 'worker'; localStorage.setItem('sk_mode', userMode); applyMode(userMode); }
     function applyMode(mode) { document.body.className = `mode-${mode}`; let txt = mode === 'worker' ? 'РАБОЧИЙ' : 'ИТР'; document.getElementById('modeText').innerText = txt; document.getElementById('mobModeText').innerText = txt; document.getElementById('modalModeText').innerText = txt; }
-    function renderHistoryTable() { const tbody = document.getElementById('history-table'); let d = cachedHistory; if (selId) d = cachedHistory.filter(h => h.order_id == selId); tbody.innerHTML = d.map(h => createHistoryRow(h)).join(''); }
     
-    function selectOrder(id, name) { selId = id; selName = name; localStorage.setItem('sk_id_fin11', id); localStorage.setItem('sk_name_fin11', name); updateUI(); document.querySelectorAll('.order-card.active').forEach(e => e.classList.remove('active')); const newActive = document.getElementById(`ord-card-${id}`); if(newActive) newActive.classList.add('active'); renderHistoryTable(); if(isMobile()) { document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); switchMobileTab('home'); } }
-    function showAllScans() { selId = null; selName = null; localStorage.removeItem('sk_id_fin11'); document.getElementById('btn-all-scans').classList.add('active'); updateUI(); renderSidebar(cachedOrders); renderHistoryTable(); if(isMobile()) { document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); switchMobileTab('history'); } }
-    function updateUI() { const status = document.getElementById('scan-status'); const inp = document.getElementById('serial-input'); if(selId) { const o = cachedOrders.find(x => x.id == selId); if(o) selName = o.name; status.innerHTML = `В РАБОТЕ: <span class="text-blue text-uppercase">${escapeHtml(selName)}</span>`; inp.disabled = false; inp.placeholder = "СКАНИРУЙТЕ..."; if (!isMobile()) setTimeout(() => inp.focus(), 100); const stats = cachedOrders.find(x => x.id == selId); if(stats) { document.getElementById('stat-total').innerText = stats.local_scanned; document.getElementById('stat-total-label').innerText = stats.name; } } else { status.innerHTML = "ВЫБЕРИТЕ ЗАКАЗ"; inp.disabled = true; inp.placeholder = ""; } }
-    
-    async function createOrder() { 
-        const name = document.getElementById('new-name').value.trim(); 
-        const target = document.getElementById('new-target').value; 
-        const type = document.querySelector('input[name="ntype"]:checked').value; 
-        const allowDups = document.getElementById('allow-dups').checked; 
-        if(!name) return; 
-        await fetch('/action/add_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, type, target, allow_dups: allowDups}) }); 
-        bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide(); 
-        document.getElementById('new-name').value = ''; 
+    async function selectOrder(id, name) { 
+        selId = id; selName = name; localStorage.setItem('sk_id_fin11', id); localStorage.setItem('sk_name_fin11', name); 
+        updateUI(); 
+        document.querySelectorAll('.order-card.active').forEach(e => e.classList.remove('active')); const newActive = document.getElementById(`ord-card-${id}`); if(newActive) newActive.classList.add('active'); 
+        try { const res = await fetch(`/api/order_history?id=${id}`); currentOrderHistory = await res.json(); renderHistoryTable(currentOrderHistory); } catch(e) { console.error(e); }
+        if(isMobile()) { closeAllOverlays(); switchMobileTab('home'); } 
     }
     
-    function openEditOrderModal(id, name, target, scanned, e) { if(e) e.stopPropagation(); document.getElementById('edit-id').value = id; document.getElementById('edit-name').value = name; document.getElementById('edit-target').value = target; document.getElementById('edit-scanned').value = scanned; new bootstrap.Modal(document.getElementById('editOrderModal')).show(); }
+    function showAllScans() { 
+        selId = null; selName = null; localStorage.removeItem('sk_id_fin11'); 
+        const btnAll = document.getElementById('btn-all-scans'); if(btnAll) btnAll.classList.add('active'); 
+        document.querySelectorAll('.order-card.active').forEach(e => e.classList.remove('active'));
+        updateUI(); renderSidebar(cachedOrders); renderHistoryTable(cachedHistory); 
+        if(isMobile()) { closeAllOverlays(); switchMobileTab('history'); } 
+    }
+    
+    function renderHistoryTable(data) { 
+        const tbody = document.getElementById('history-table'); if (!tbody) return;
+        const list = data || cachedHistory;
+        if (!list || list.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted p-4">Нет записей</td></tr>'; return; }
+        tbody.innerHTML = list.map(h => createHistoryRow(h)).join(''); 
+    }
+    
+    function updateUI() { const status = document.getElementById('scan-status'); const inp = document.getElementById('serial-input'); if(selId) { const o = cachedOrders.find(x => x.id == selId); if(o) selName = o.name; status.innerHTML = `В РАБОТЕ: <span class="text-blue text-uppercase">${escapeHtml(selName)}</span>`; inp.disabled = false; inp.placeholder = "СКАНИРУЙТЕ..."; if (!isMobile()) setTimeout(() => inp.focus(), 100); const stats = cachedOrders.find(x => x.id == selId); if(stats) { 
+    } } else { status.innerHTML = "ВЫБЕРИТЕ ЗАКАЗ"; inp.disabled = true; inp.placeholder = ""; } }
+    async function createOrder() { const name = document.getElementById('new-name').value.trim(); const target = document.getElementById('new-target').value; const type = document.querySelector('input[name="ntype"]:checked').value; const allowDups = document.getElementById('allow-dups').checked; if(!name) return; await fetch('/action/add_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, type, target, allow_dups: allowDups}) }); bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide(); document.getElementById('new-name').value = ''; }
+    function openEditOrderModal(id, name, target, scanned, allowDups, e) { 
+        if(e) e.stopPropagation(); 
+        document.getElementById('edit-id').value = id; 
+        document.getElementById('edit-name').value = name; 
+        document.getElementById('edit-target').value = target; 
+        document.getElementById('edit-scanned').value = scanned; 
+        document.getElementById('edit-dups').checked = (allowDups === 1 || allowDups === true);
+        new bootstrap.Modal(document.getElementById('editOrderModal')).show(); 
+    }
     async function saveOrderEdit() { 
-        const id = parseInt(document.getElementById('edit-id').value);
-        const name = document.getElementById('edit-name').value;
-        const target = parseInt(document.getElementById('edit-target').value);
-        const scanned = parseInt(document.getElementById('edit-scanned').value);
-        await fetch('/action/edit_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, name, target, scanned_count: scanned}) });
+        const id = parseInt(document.getElementById('edit-id').value); 
+        const name = document.getElementById('edit-name').value; 
+        const target = parseInt(document.getElementById('edit-target').value); 
+        const scanned = parseInt(document.getElementById('edit-scanned').value); 
+        const allowDups = document.getElementById('edit-dups').checked; 
+
+        await fetch('/action/edit_order', { 
+            method:'POST', 
+            headers:{'Content-Type':'application/json'}, 
+            body:JSON.stringify({id, name, target, scanned_count: scanned, allow_dups: allowDups}) 
+        }); 
         bootstrap.Modal.getInstance(document.getElementById('editOrderModal')).hide(); 
     }
-    
     let pendingDeleteAction = null;
     function showConfirmModal(title, msg, action) { document.getElementById('confirmTitle').innerText = title; document.getElementById('confirmMsg').innerText = msg; pendingDeleteAction = action; new bootstrap.Modal(document.getElementById('confirmModal')).show(); }
     document.getElementById('confirmBtnAction').addEventListener('click', () => { if(pendingDeleteAction) pendingDeleteAction(); bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide(); });
     async function deleteOrderDirectly(id, e) { if(e) e.stopPropagation(); showConfirmModal("Удалить заказ?", "Данные будут утеряны.", async () => { await fetch('/action/delete_order', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: parseInt(id)}) }); }); }
-    function deleteScan(id, e) { if (e) e.stopPropagation(); showConfirmModal("Удалить запись?", "Отменить нельзя.", () => { fetch('/action/delete_scan', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id: parseInt(id)}) }); }); }
     
-    function confirmShutdown() {
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('shutdownModal')).hide();
-        const div = document.createElement('div');
-        div.className = 'shutdown-screen';
-        div.innerHTML = `<i class="bi bi-exclamation-triangle-fill warning-tri"></i><h1 class="mt-4 fw-bold text-white text-uppercase" style="letter-spacing: 4px;">MES ВЫКЛЮЧАЕТСЯ</h1><div class="progress mt-4" style="width: 300px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;"><div class="progress-bar bg-danger" style="width: 0%; transition: width 3s linear;"></div></div>`;
-        document.body.appendChild(div);
-        setTimeout(() => div.querySelector('.progress-bar').style.width = '100%', 50);
-        setTimeout(async () => { try { await fetch('/action/shutdown', { method: 'POST' }); } catch(e) {} window.close(); div.innerHTML = `<h1 class="text-danger fw-bold" style="font-size:3rem">СЕРВЕР ОСТАНОВЛЕН</h1>`; }, 3000);
+    // ИСПРАВЛЕННАЯ ФУНКЦИЯ УДАЛЕНИЯ СКАНА
+    function deleteScan(id, e) { 
+        if (e) e.stopPropagation(); 
+        showConfirmModal("Удалить запись?", "Отменить нельзя.", async () => { 
+            const res = await fetch('/action/delete_scan', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({id: parseInt(id)}) 
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                if (selId) {
+                    try {
+                        const histRes = await fetch(`/api/order_history?id=${selId}`);
+                        currentOrderHistory = await histRes.json();
+                        renderHistoryTable(currentOrderHistory);
+                    } catch (err) { console.error(err); }
+                } else {
+                    cachedHistory = cachedHistory.filter(h => h.id !== id);
+                    renderHistoryTable(cachedHistory);
+                }
+            }
+        }); 
     }
 
-    function downloadExcel() { const dFrom = document.getElementById('export-date-from').value; const dTo = document.getElementById('export-date-to').value; const category = document.querySelector('input[name="btnExportType"]:checked').value; window.location.href = `/export?date_from=${dFrom}&date_to=${dTo}&category=${category}`; }
+    function confirmShutdown() { 
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('shutdownModal')).hide(); 
+        const div = document.createElement('div'); 
+        div.className = 'shutdown-screen'; 
+        
+        div.innerHTML = `<i class="bi bi-exclamation-triangle-fill warning-tri"></i><h1 class="mt-4 fw-bold text-white text-uppercase" style="letter-spacing: 4px;">MES ВЫКЛЮЧАЕТСЯ</h1><div class="progress mt-4" style="width: 300px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;"><div class="progress-bar bg-danger" style="width: 0%; transition: width 1s linear;"></div></div>`; 
+        
+        document.body.appendChild(div); 
+        setTimeout(() => div.querySelector('.progress-bar').style.width = '100%', 50); 
+        
+        setTimeout(async () => { 
+            try { await fetch('/action/shutdown', { method: 'POST' }); } catch(e) {} 
+            window.close(); 
+            div.innerHTML = `<h1 class="text-danger fw-bold" style="font-size:3rem">СЕРВЕР ОСТАНОВЛЕН</h1>`; 
+        }, 1000); 
+    }
+    function downloadExcel() { const dFrom = document.getElementById('export-date-from').value; const dTo = document.getElementById('export-date-to').value; const category = document.querySelector('input[name="btnExportType"]:checked').value; const link = document.createElement('a'); link.href = `/export?date_from=${dFrom}&date_to=${dTo}&category=${category}`; link.download = `Report_${dTo}.xlsx`; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
+
+    // === УМНАЯ ЛОГИКА RESIZE (С ЗАЩИТОЙ ОТ НАЕЗДА) ===
     
-    function switchMobileTab(tabName) { if (window.innerWidth > 768) return; document.querySelectorAll('.nav-item-mobile').forEach(btn => btn.classList.remove('active')); const icons = { 'home': 'bi-upc-scan', 'orders': 'bi-list-task', 'history': 'bi-clock-history' }; document.querySelectorAll('.nav-item-mobile').forEach(btn => { if(btn.querySelector(`.${icons[tabName]}`)) btn.classList.add('active'); }); if (tabName === 'orders') { const sb = document.getElementById('sidebar'); if (!sb.classList.contains('active')) toggleSidebar(); return; } document.getElementById('sidebar').classList.remove('active'); document.getElementById('overlay').classList.remove('active'); document.querySelectorAll('.mobile-view-section').forEach(el => el.classList.remove('active')); if (tabName === 'home') { document.getElementById('mob-home').classList.add('active'); setTimeout(() => document.getElementById('serial-input').focus(), 100); } else if (tabName === 'history') { document.getElementById('mob-history').classList.add('active'); } }
+    function restoreLayoutSizes() {
+        if(window.innerWidth <= 768) return; 
+        const saved = JSON.parse(localStorage.getItem('sk_layout_sizes') || '{}');
+        
+        const leftCol = document.getElementById('left-col-wrapper');
+        const histPanel = document.getElementById('mob-history');
+
+        if (saved.colWidth && leftCol) {
+            // Проверяем, не вылазит ли сохраненный размер за пределы текущего экрана
+            const maxW = document.querySelector('.work-section').clientWidth - 260; // 260px запас для правой карты
+            const safeW = Math.min(saved.colWidth, maxW);
+            leftCol.style.flex = `0 0 ${safeW}px`;
+        }
+        
+        if (saved.histHeight && histPanel) {
+             histPanel.style.flex = 'none';
+             histPanel.style.height = `${saved.histHeight}px`;
+        }
+    }
+
+    function initResizers() {
+        // 1. РЕСАЙЗ ЛЕВОЙ КОЛОНКИ (Ширина)
+        // Логика: Левая колонка не должна задавить Правую (stat-card main)
+        makeResizable('resizer-col', (dx, dy) => {
+            const leftCol = document.getElementById('left-col-wrapper');
+            const container = document.querySelector('.work-section');
+            const gap = 25; // Отступ между колонками (из CSS .work-section gap)
+            const minRightWidth = 250; // Минимальная ширина правой карты
+
+            // Текущая ширина
+            const curW = leftCol.getBoundingClientRect().width;
+            let newW = curW + dx;
+
+            // ОГРАНИЧЕНИЕ 1: Минимальная ширина самой левой колонки
+            if (newW < 250) newW = 250;
+
+            // ОГРАНИЧЕНИЕ 2: Максимальная ширина (чтобы справа осталось место)
+            const maxAvailable = container.clientWidth - minRightWidth - gap;
+            if (newW > maxAvailable) newW = maxAvailable;
+
+            // Применяем
+            leftCol.style.flex = `0 0 ${newW}px`;
+            saveLayoutSize('colWidth', newW);
+        });
+
+        // 2. РЕСАЙЗ ИСТОРИИ (Высота)
+        // Логика: История не должна задавить Сканер снизу
+        makeResizable('resizer-hist', (dx, dy) => {
+            const histPanel = document.getElementById('mob-history');
+            const leftCol = document.getElementById('left-col-wrapper'); // Родитель
+            const gap = 25; // gap родителя
+            const minScannerHeight = 140; // Минимальная высота сканера
+
+            // Текущая высота
+            const curH = histPanel.getBoundingClientRect().height;
+            let newH = curH + dy;
+
+            // ОГРАНИЧЕНИЕ 1: Минимум самой истории
+            if (newH < 150) newH = 150;
+
+            // ОГРАНИЧЕНИЕ 2: Максимум (чтобы снизу для сканера осталось место)
+            // Высота родителя минус отступы минус минимум сканера
+            const parentHeight = leftCol.clientHeight; 
+            // Учитываем padding родителя если есть, но здесь gap главное
+            const maxAvailable = parentHeight - minScannerHeight - gap;
+            
+            if (newH > maxAvailable) newH = maxAvailable;
+
+            // Применяем
+            histPanel.style.flex = 'none'; // Отключаем flex-растягивание
+            histPanel.style.height = `${newH}px`;
+            saveLayoutSize('histHeight', newH);
+        });
+    }
+
+    // Базовая функция механики перетаскивания (без изменений логики, только стиль курсора)
+    function makeResizable(handleId, onResize) {
+        const handle = document.getElementById(handleId);
+        if (!handle) return;
+
+        let startX, startY;
+
+        handle.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            e.stopPropagation(); // Важно, чтобы не выделялся текст
+            
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            document.documentElement.addEventListener('mousemove', doDrag, {passive: false});
+            document.documentElement.addEventListener('mouseup', stopDrag, false);
+            
+            document.body.style.cursor = 'nwse-resize';
+            document.body.style.userSelect = 'none';
+            // Добавляем класс, чтобы подсветить активный процесс (опционально)
+            handle.classList.add('active');
+        });
+
+        function doDrag(e) {
+            // requestAnimationFrame для плавности отрисовки
+            requestAnimationFrame(() => {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                onResize(dx, dy);
+                // Обновляем стартовую позицию для следующего кадра
+                startX = e.clientX;
+                startY = e.clientY;
+            });
+        }
+
+        function stopDrag() {
+            document.documentElement.removeEventListener('mousemove', doDrag, {passive: false});
+            document.documentElement.removeEventListener('mouseup', stopDrag, false);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            handle.classList.remove('active');
+        }
+    }
+
+    function saveLayoutSize(key, val) {
+        const saved = JSON.parse(localStorage.getItem('sk_layout_sizes') || '{}');
+        saved[key] = val;
+        localStorage.setItem('sk_layout_sizes', JSON.stringify(saved));
+    }
+    // === ЛОГИКА СТАТУСА СЕТИ (КРАСНЫЙ/ЗЕЛЕНЫЙ) ===
+    function updateConnectionStatus() {
+        const dot = document.getElementById('net-dot');
+        const txt = document.getElementById('net-text');
+        const isOnline = navigator.onLine;
+
+        if (isOnline) {
+            dot.style.backgroundColor = '#10b981'; // Зеленый
+            dot.style.boxShadow = '0 0 10px #10b981';
+            txt.innerText = 'ONLINE';
+            txt.style.color = '#10b981';
+        } else {
+            dot.style.backgroundColor = '#ef4444'; // Красный
+            dot.style.boxShadow = '0 0 10px #ef4444';
+            txt.innerText = 'OFFLINE';
+            txt.style.color = '#ef4444';
+        }
+    }
+
+    // Слушаем события браузера (работает и с кабелем)
+    window.addEventListener('online', updateConnectionStatus);
+    window.addEventListener('offline', updateConnectionStatus);
+    updateConnectionStatus();
+    // --- АВТОМАТИКА ДЛЯ ОКНА ПАРОЛЯ ---
+
+    // 1. Авто-фокус при открытии (Решает проблему неактивного поля)
+    const salaryModalEl = document.getElementById('salaryModal');
+    if (salaryModalEl) {
+        salaryModalEl.addEventListener('shown.bs.modal', function () {
+            const input = document.getElementById('salary-pass-input');
+            // Принудительный фокус после завершения анимации
+            if(input && localStorage.getItem('sk_salary_unlocked') !== 'true') {
+                input.value = ''; // Очищаем старое
+                input.focus();
+            }
+        });
+    }
+
+    // 2. Авто-проверка пароля при вводе
+    const passInput = document.getElementById('salary-pass-input');
+    if (passInput) {
+        passInput.addEventListener('input', function() {
+            // Скрываем ошибку, как только начали печатать заново
+            document.getElementById('salary-error').style.opacity = '0';
+            
+            // Если введено 4 символа - проверяем
+            if (this.value.length === 4) {
+                checkSalaryPass();
+            }
+        });
+    }
+
+    // 3. Обновленная функция проверки (без кнопки)
+    function checkSalaryPass() {
+        const inp = document.getElementById('salary-pass-input');
+        const err = document.getElementById('salary-error');
+        
+        if (inp.value === '0011') {
+            // УСПЕХ
+            localStorage.setItem('sk_salary_unlocked', 'true');
+            inp.blur(); // Убираем клавиатуру
+            showSalaryContent();
+            inp.value = '';
+        } else {
+            // ОШИБКА
+            err.style.opacity = '1';
+            inp.value = ''; // Очищаем поле для новой попытки
+            
+            // Эффект тряски (визуальный фидбек)
+            inp.style.borderColor = '#ef4444';
+            inp.style.transform = 'translateX(5px)';
+            setTimeout(() => { inp.style.transform = 'translateX(-5px)'; }, 50);
+            setTimeout(() => { inp.style.transform = 'translateX(0)'; inp.style.borderColor = ''; }, 150);
+            
+            // Возвращаем фокус, чтобы вводить заново сразу
+            inp.focus();
+        }
+    }
 </script>
 </body>
 </html>
